@@ -1,0 +1,8 @@
+! Muista katsoa että kaikki herkut on latauksessa kohdallaan e.g. ApplyNoise
+! Tyhjennä log.txt
+! tyhjennä saves
+! Encrypt päälle
+! Tarkasta versionumerot
+! Tarkasta, että readme on ajan tasalla
+! Säädä aloitus tasot nopeudelle ja maxdistille
+! Koko näyttö päälle

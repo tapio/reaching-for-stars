@@ -1,0 +1,1546 @@
+// PROJECT: Reaching for Stars
+// VERSION: beta 3
+// AUTHOR:  Tapio Vierros
+// FILE:    game.cb - game screen functions
+// LICENSE: See LICENSE-file
+
+Const version = "beta 3"
+
+SCREEN 800,600,32,Int(ReadValue("Config.ini","windowedmode","1"))
+Global w, h, halfw, halfh
+w = ScreenWidth(): halfw = w/2
+h = ScreenHeight(): halfh = h/2
+SetWindow "Reaching for Stars!"
+DefaultMask ON, 255,0,255
+SAFEEXIT OFF
+
+Include "load.cb"
+ShowMouse cursor
+
+Menu(1)
+MainLoop()
+
+
+// ----- MAIN LOOP ----- //
+Function MainLoop()
+    If gLoadingCompleted = 0 Then Load() 
+    Repeat
+        Controls()
+        Display()
+        
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+        If KeyDown(cbkeyF)  Then Color cbWhite: Text 10,10, FPS()
+        If KeyHit(1)        Then Menu()
+        If KeyHit(cbkeyF9)  Then temp = SaveLoadScreen(1)
+        If KeyHit(cbkeyF10) Then temp = SaveLoadScreen(0): calcStars=True
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        If KeyHit(cbkeyF12) Then quit = MsgBox("Are you sure you want to quit?","Yes...","No!")
+        DrawScreen
+    Until quit
+    End
+End Function
+// --------------------- //
+
+Function Controls()
+    bgsmx = 0: bgsmy = 0
+    mouseover = 0
+    originTX = 0 : originTY = 0 : originTZ = 0
+
+    'If KeyHit(cbkey0)  Then SetSpaceVisible()
+    'If KeyHit(cbkey9)  Then UpdateKnownSpace(curplayer)
+
+    If KeyHit(cbkeygrave) Then Console()
+    If KeyDown(cbkeyH) And KeyDown(cbkeyI) Then name$ = InputBox("My name is Tapio, what is yours?"): temp=MsgBox("Hello "+name$)
+    If KeyHit(cbkeyX) Then Repeat:PixX(Rand(1,w),Rand(1,h)):Until (KeyDown(1) Or KeyDown(cbkeyX) Or KeyDown(cbkeyReturn) Or KeyDown(cbkeySpace))
+    
+    // Where's the mouse?
+    If BoxOverlap(MouseX(),MouseY(),1,1, tab2x,tab2y,200,200) Then
+        If BoxOverlap(MouseX(),MouseY(),1,1, tab1x,tab1y,200,400) Then        
+            mouseover = activetab
+            Goto exmo
+        EndIf
+        mouseover = 2
+    ElseIf BoxOverlap(MouseX(),MouseY(),1,1, tab1x,tab1y,200,400) Then
+        mouseover = 1
+    Else
+        mouseover = 0
+    EndIf
+    exmo:
+
+    If KeyHit(cbKeyTab) Then tab1x=600: tab1y=0: tab2x=600: tab2y=400: dragtab=False: PositionStars(-200,0,-300)
+
+    // Mouse hits stars?
+    If MouseHit(1) Then
+        If mouseover = 0 Then
+            'If seldest = False Then sel = 0
+            For i = maxsols+fleets To 1 Step -1
+                If Distance(MouseX(),MouseY(),draworder(i,4),draworder(i,5)) < ImageWidth(imgstar(Int(draworder(i,7)),Int(draworder(i,8))))/2 Then 'draworder(i,8)/2 Then
+                    If selDest = False Then
+                        sel = draworder(i,0)
+                        numsendships = 0
+                        numsendcolons = 0
+                    Else
+                        If draworder(i,0) > 0 Then dest = draworder(i,0)
+                    EndIf
+                    Exit
+                EndIf
+            Next i
+        EndIf
+    EndIf
+    
+    If MouseHit(3) Or KeyHit(cbkeybackspace) Then sel = 0
+    
+    // Mouse moves things...
+    If MouseUp(1)  Then dragtab = 0
+    If MouseDown(1) And dragtab = 0 Then
+        If mouseover <> 0 Then activetab = mouseover
+        If mouseover = 0 Then
+            TranslateStars(MouseX()-oldmx, oldmy-MouseY(), 0)
+        ElseIf BoxOverlap(MouseX(),MouseY(),1,1, tab2x,tab2y,200,20) Then
+            dragtab    = 2
+            dragpointx = 200-(tab2x+200-MouseX())
+            dragpointy = 20-(tab2y+20-MouseY())
+            activetab  = 2
+        ElseIf BoxOverlap(MouseX(),MouseY(),1,1, tab1x,tab1y,200,20) Then
+            dragtab    = 1
+            dragpointx = 200-(tab1x+200-MouseX())
+            dragpointy = 20-(tab1y+20-MouseY())
+            activetab  = 1
+        EndIf
+    ElseIf MouseDown(2) Then
+        If mouseover = 0 Then
+            RotateStars(MouseX()-oldmx, 0, 1, 0)
+            RotateStars(MouseY()-oldmy, 1, 0, 0)
+            bgsmx = MouseX()-oldmx
+            bgsmy = MouseY()-oldmy
+        Else
+            activetab = mouseover
+        EndIf
+    EndIf
+    
+    If rotatestyle = 0 Then
+        If sel > 0 And KeyDown(cbkeyLShift)=False And KeyDown(cbkeyRShift)=False Then 
+            originTX = sol(sel,1)
+            originTY = sol(sel,2)
+            originTZ = sol(sel,3)
+        ElseIf sel < 0 And KeyDown(cbkeyLShift)=False And KeyDown(cbkeyRShift)=False Then
+            originTX = fleet(-sel,1)
+            originTY = fleet(-sel,2)
+            originTZ = fleet(-sel,3)            
+        EndIf
+    EndIf
+    If Distance3d(originX,originY,originZ,originTX,originTY,originTZ) > .1 Then
+        OriginX = CurveValue(originTX,originX,20)
+        OriginY = CurveValue(originTY,originY,20)
+        OriginZ = CurveValue(originTZ,originZ,20)
+    EndIf
+
+    TranslateStars(0,0,MouseMoveZ()*10)
+    If mStars(15) > -LENS-1 Then mStars(15) = -LENS-1
+    If mStars(15) < -800 Then mStars(15) = -800    
+
+    oldmx = MouseX()
+    oldmy = MouseY()    
+
+    If dragtab = 1 Then
+        tab1x = MouseX() - dragpointx
+        tab1y = MouseY() - dragpointy
+    ElseIf dragtab = 2 Then
+        tab2x = MouseX() - dragpointx
+        tab2y = MouseY() - dragpointy
+    EndIf
+
+    If KeyHit(cbkeySpace) Then rotatestyle = Not rotatestyle
+
+    // buttons
+    If mouseover = 1 Then 
+        If bMinimize1 Then tab1state = Not tab1state
+        If sel > 0 Then
+            If bShipsPlus  And numsendships < RoundDown(ships(sel)) Then numsendships+1
+            If bShipsMinus And numsendships > 0 Then numsendships-1
+        EndIf
+        If bSelDest Then selDest = Not selDest: dest = 0
+        If selDest And numsendships <= 0 And sel > 0 Then selDest = False
+        If bAcceptDest Then NewFleet(curplayer,dest,numsendships,numsendcolons,sel)
+        If bSetCourse Then selDest = Not selDest: dest = 0
+        If bLand And selDest = 0 Then LandFleet(-sel)
+        If bLand And selDest <> 0 Then fstats(-sel,2) = dest: selDest = 0: dest = 0: bLand = 0
+        If bSpies Then
+            If MsgBox("Hiring spies deduces 25 from your total production resources.","OK","Cancel") = 1 Then
+                If totprod(curplayer) => 25 Then
+                    spies(curplayer,sel) = 1
+                    costs = costs + 25
+                    UpdateTotProd(solowner(sel))
+                    UpdateTotProd(curplayer)
+                Else
+                    temp = MsgBox("You don't have enough resources.")
+                EndIf
+            EndIf
+        EndIf
+        If bSaboteurs Then SaboteurScreen()
+    ElseIf mouseover = 2 Then 
+        If bMinimize2 Then tab2state = Not tab2state
+        If bFleets Then generaltabmode = 1
+        If bStars Then generaltabmode = 2
+        If bGeneralBack Then generaltabmode = 0 
+        If bTechnology Then Tech()
+        If bDiplomacy Then Diplomacy()
+        If bReport Then AnnualReport()
+        If bEndTurn Then NEXTTURN()
+    EndIf
+
+End Function
+
+
+// DISPLAY //
+Function Display(disable=0)
+    If sol(0,6) = False Then DrawImage imgneb(curneb), sol(0,4), sol(0,5)
+    DrawBGStars()
+    DrawGalaxy(calcstars)
+    SetFont normalfont
+    If sel > 0 Then 
+        Color cbRed: Box sol(sel,4)-sol(sel,8)/2, sol(sel,5)-sol(sel,8)/2, sol(sel,8), sol(sel,8), OFF
+    ElseIf sel < 0 Then
+        If fstats(-sel,1) <> 0 Then
+            'Color cbYellow: Box fleet(-sel,4)-fleet(-sel,8)/8, fleet(-sel,5)-fleet(-sel,8)/8, fleet(-sel,8)/6, fleet(-sel,8)/6, OFF
+            Color cbYellow: Box2(fleet(-sel,4)-fleet(-sel,8)/8, fleet(-sel,5)-fleet(-sel,8)/8, fleet(-sel,4)+fleet(-sel,8)/8, fleet(-sel,5)+fleet(-sel,8)/8)
+            vaihe = ( (Int(Mid( Str(Timer()), Len(Str(Timer()))-2, 1))) Mod 3 )
+            'Text 10,10,vaihe
+            If fstats(-sel,2) <> 0 Then Color cbBlue: DottedLine(fleet(-sel,4), fleet(-sel,5), sol(fstats(-sel,2),4), sol(fstats(-sel,2),5), 3, vaihe)
+            'If fstats(-sel,2) <> 0 Then Color cbBlue:   Line fleet(-sel,4), fleet(-sel,5), sol(fstats(-sel,2),4), sol(fstats(-sel,2),5)
+        Else
+            sel=0
+        EndIf
+    EndIf
+    If selDest = True And dest > 0 Then
+        vaihe = ( (Int(Mid( Str(Timer()), Len(Str(Timer()))-2, 1))) Mod 5 )
+        If sel > 0 Then
+            If dist2dest =< maxdist(curplayer) Then Color 0,255,0 Else Color 255,0,0
+            DashedLine(sol(sel,4), sol(sel,5), sol(dest,4), sol(dest,5), 5, vaihe)
+        ElseIf sel < 0 Then
+            If dist2dest =< fstats(-sel,5) Then Color 0,255,0 Else Color 255,0,0
+            DashedLine(fleet(-sel,4), fleet(-sel,5), sol(dest,4), sol(dest,5), 5, vaihe)
+        EndIf
+    EndIf
+    
+    If disable=1 Then activetab+2
+    If activetab = 1 Then
+        DrawGeneralTab()
+        DrawContextTab()
+    ElseIf activetab = 2 Then
+        DrawContextTab()
+        DrawGeneralTab()
+    ElseIf activetab = 3 Then // these two are for inputbox and messagebox
+        DrawGeneralTab()
+        DrawContextTab()
+    ElseIf activetab = 4 Then
+        DrawContextTab()
+        DrawGeneralTab()
+    EndIf
+    If disable=1 Then activetab-2
+End Function
+
+
+
+    // CONTEXT TAB
+Function DrawContextTab()
+    enabl = (1=activetab)
+    If tab1state = 0 Then
+        DrawImageBox tab1, tab1x, tab1y, 0, 0, 200, 20
+        bMinimize1 = button(tabstate(tab1state),tab1x+185,tab1y+5,10,10,enabl)
+        Color 64,64,64
+        Text tab1x+10, tab1y+2, "Context-->"    
+    Else
+        DrawImage tab1, tab1x, tab1y
+        bMinimize1 = button(tabstate(tab1state),tab1x+185,tab1y+5,10,10,enabl)
+        Color 64,64,64
+
+        If sel = 0 Then
+            Text tab1x+10, tab1y+2, "Select a Star or Fleet..."
+        ElseIf sel > 0 Then
+            DrawImage imgbigstar(Int(sol(sel,7))), tab1x+10, tab1y+30
+            If sol(sel,9) = 0 Then
+                Text tab1x+10, tab1y+2, solname(sel) + " - " + racename(solowner(sel))
+                If solowner(sel) = curplayer Then
+                    SetFont smallfont
+                    Color 0,70,0
+                    Text tab1x+140, tab1y+30, "Max Pop"
+                    Text tab1x+140, tab1y+40, RoundDown(maxpop(sel))+" M"
+                    Color 0,50,0                
+                    Text tab1x+140, tab1y+60, "Population"
+                    Text tab1x+140, tab1y+70, dec(pop(sel),1)+" M"
+                    Text tab1x+140, tab1y+85, "Ships"
+                    Text tab1x+140, tab1y+95, RoundDown(ships(sel))
+                    Text tab1x+140, tab1y+110, "Cannons"
+                    Text tab1x+140, tab1y+120, RoundDown(canns(sel))
+                    Color 0,0,100
+                    Text tab1x+20, tab1y+170, "This year's available"
+                    Text tab1x+20, tab1y+178, "production resources:"
+                    SetFont normalfont
+                    Color 0,0,120
+                    Text tab1x+130, tab1y+170, dec(prodres(sel),1)
+                    SetFont smallfont
+                    Color 48,96,0
+                    Text tab1x+20, tab1y+200, "Research"
+                    Text tab1x+20, tab1y+220, "Ecology"
+                    Text tab1x+20, tab1y+240, "Defences"
+                    Text tab1x+20, tab1y+260, "Ships"
+                    slid_tech(sel) = slider(tab1x+70,tab1y+200,70,12,100,slid_tech(sel),enabl)
+                    slid_eco(sel) = slider(tab1x+70,tab1y+220,70,12,100,slid_eco(sel),enabl)
+                    slid_defe(sel) = slider(tab1x+70,tab1y+240,70,12,100,slid_defe(sel),enabl)
+                    slid_ships(sel) = slider(tab1x+70,tab1y+260,70,12,100,slid_ships(sel),enabl)
+                    slidsum# = slid_ships(sel) + slid_defe(sel) + slid_eco(sel) + slid_tech(sel)
+                    If slidsum <> 200 Then
+                        slid_tech(sel)  = Min(slid_tech(sel) /slidsum#*200.0  ,100.0)
+                        slid_eco(sel)   = Min(slid_eco(sel)  /slidsum#*200.0  ,100.0)
+                        slid_defe(sel)  = Min(slid_defe(sel) /slidsum#*200.0  ,100.0)
+                        slid_ships(sel) = Min(slid_ships(sel)/slidsum#*200.0  ,100.0)
+                        UpdateRR(curplayer)
+                    EndIf
+                    Color 0,0,80
+                    Text tab1x+145, tab1y+200, dec(slid_tech(sel) / 100.0 * prodres(sel),0) + " RR"
+                    Text tab1x+145, tab1y+220, dec(getPopIncrease(sel), (getPopIncrease(sel)<100)) + " POP"
+                    Text tab1x+145, tab1y+240, dec(slid_defe(sel) / 100.0 * prodres(sel) / 20.0, 1) + " /year"
+                    Text tab1x+145, tab1y+260, dec(slid_ships(sel) / 100.0 * prodres(sel) / 50.0, 1) + " /year"
+                    
+                    SetFont normalfont
+                    Color 10,10,10
+                    Box tab1x+18, tab1y+335, 174, 50, OFF
+                    Color 64,64,64
+                    Text tab1x+15, tab1y+320, "Send Fleet"
+                    Text tab1x+20, tab1y+340, "Ships"
+                    Text tab1x+20, tab1y+355, "Colonists"
+                    Text tab1x+20, tab1y+370, "Distance"
+                    CenterText tab1x+106, tab1y+340, numsendships
+                    If dest <> 0 Then 
+                        dist2dest = Distance3d(sol(sel,1), sol(sel,2), sol(sel,3), sol(dest,1), sol(dest,2), sol(dest,3))
+                        If dist2dest =< maxdist(curplayer) Then Color 0,255,0 Else Color 255,0,0
+                        CenterText tab1x+106, tab1y+370, dec(dist2dest/lyfactor,1)+" ly"
+                    EndIf
+                    bShipsMinus = button("<",tab1x+80,tab1y+340,12,12,enabl,1)
+                    bShipsPlus = button(">",tab1x+120,tab1y+340,12,12,enabl,1)
+                    numsendcolons = slider(tab1x+80,tab1y+355,105,12,pop(sel),numsendcolons,enabl,1)
+                    If selDest = False Then bSelDest = button("Dest",tab1x+135,tab1y+340,50,12,enabl) Else bSelDest = button("Cancel",tab1x+135,tab1y+340,50,12,enabl)
+                    If selDest = True And dest <> 0 And dist2dest <= maxdist(curplayer) And numsendships > 0 Then bAcceptDest = button("Accept",tab1x+135,tab1y+370,50,12,enabl)
+                ElseIf solowner(sel) <> 0 Then
+                    If spies(curplayer,sel)>0 Then
+                        SetFont smallfont
+                        Color 0,70,0
+                        Text tab1x+140, tab1y+30, "Max Pop"
+                        Text tab1x+140, tab1y+40, maxpop(sel)                
+                        Color 0,50,0                
+                        Text tab1x+140, tab1y+60, "Population"
+                        Text tab1x+140, tab1y+70, dec(pop(sel),1)
+                        Text tab1x+140, tab1y+85, "Ships"
+                        Text tab1x+140, tab1y+95, RoundDown(ships(sel))
+                        Text tab1x+140, tab1y+110, "Cannons"
+                        Text tab1x+140, tab1y+120, RoundDown(canns(sel))
+                        Color 0,0,100
+                        Text tab1x+20, tab1y+170, "This year's available"
+                        Text tab1x+20, tab1y+178, "production resources:"
+                        SetFont normalfont
+                        Color 0,0,150
+                        Text tab1x+130, tab1y+170, dec(prodres(sel),1)
+                    ElseIf sol(sel,9) = 0 Then
+                        If totprod(curplayer) > 0 Then bSpies = button("Hire Spies",tab1x+20,tab1y+345,160,20,enabl)
+                    EndIf
+                    If totprod(curplayer) > 0 Then bSaboteurs = button("Hire Saboteurs",tab1x+20,tab1y+370,160,20,enabl)
+                Else
+                    SetFont normalfont
+                    Color 0,0,64
+                    RowText(stardesc(Int(sol(sel,7))),tab1x+20,tab1x+180,tab1y+170)
+                EndIf
+            Else
+                SetFont normalfont
+                Color 64,64,64
+                Text tab1x+10, tab1y+2, "Unknown"
+                Color 0,0,64
+                RowText(stardesc(Int(sol(sel,7))),tab1x+20,tab1x+180,tab1y+170)
+                Color 64,0,64
+                RowText("You need to improve your propulsion technology in order to reach this far.",tab1x+20,tab1x+180,tab1y+300)
+            EndIf
+        Else
+            DrawImage imgbigstar(0), tab1x+10, tab1y+30
+            Text tab1x+10, tab1y+2, fleetname(-sel) + " - " + racename(fstats(-sel,1))
+            If fstats(-sel,1) = curplayer Then
+                SetFont smallfont
+                Color 0,180,0
+                Text tab1x+140, tab1y+30, "Destination"
+                Text tab1x+140, tab1y+40, solname(fstats(-sel,2))
+                Text tab1x+140, tab1y+60, "Ships"
+                Text tab1x+140, tab1y+70, fstats(-sel,3)
+                Text tab1x+140, tab1y+85, "Colonists"
+                Text tab1x+140, tab1y+95, fstats(-sel,4)
+                Text tab1x+140, tab1y+110, "Years Left"
+                Text tab1x+140, tab1y+120, RoundUp(Distance3d(fleet(-sel,1), fleet(-sel,2), fleet(-sel,3), sol(fstats(-sel,2),1), sol(fstats(-sel,2),2), sol(fstats(-sel,2),3)) / speed(curplayer))
+                SetFont normalfont
+                'bHalt = button("Halt",tab1x+20,tab1y+335,160,20,enabl)
+                If dest <> 0 Then 
+                    dist2dest = Distance3d(fleet(-sel,1), fleet(-sel,2), fleet(-sel,3), sol(dest,1), sol(dest,2), sol(dest,3))
+                    If dist2dest =< fstats(-sel,5) Then Color 0,255,0 Else Color 255,0,0
+                    Text tab1x+20, tab1y+290, "Distance: "+dec(dist2dest/lyfactor,1)+" ly"
+                    Color 0,0,128
+                    Text tab1x+20, tab1y+305, "Allowed:  "+dec(fstats(-sel,5)/lyfactor,1)+" ly"
+                    Text tab1x+20, tab1y+320, "Years:      "+RoundUp(dist2dest / speed(fstats(-sel,1)))
+                EndIf
+                If Distance3d(fleet(-sel,1), fleet(-sel,2), fleet(-sel,3), sol(fstats(-sel,2),1), sol(fstats(-sel,2),2), sol(fstats(-sel,2),3)) < 1  And selDest=0 Then
+                    bLand = button("- Land -",tab1x+20,tab1y+345,160,20,enabl)
+                ElseIf selDest=1 And dest<>0 And dist2dest <= fstats(-sel,5) Then 
+                    bLand = button("Accept",tab1x+20,tab1y+345,160,20,enabl)
+                EndIf
+                If selDest=0 Then bSetCourse = button("Set new course",tab1x+20,tab1y+370,160,20,enabl) Else bSetCourse = button("Cancel",tab1x+20,tab1y+370,160,20,enabl)
+            EndIf
+        EndIf
+    EndIf
+End Function
+
+
+    // GENERAL TAB
+Function DrawGeneralTab()
+    bFleets      = 0
+    bStars       = 0
+    bGeneralBack = 0
+    enabl = (2=activetab)
+    SetFont normalfont
+    If tab2state = 0 Then
+        DrawImageBox tab2, tab2x, tab2y, 0, 0, 200, 20
+        bMinimize2 = button(tabstate(tab2state),tab2x+185,tab2y+5,10,10,enabl)
+        Color 32,32,32
+        Text tab2x+10, tab2y+2, racename(curplayer)
+    Else
+        DrawImage tab2, tab2x, tab2y
+        bMinimize2 = button(tabstate(tab2state),tab2x+185,tab2y+5,10,10,enabl)
+        If generaltabmode = 1 Then
+            Color 32,32,32
+            Text tab2x+10, tab2y+2, racename(curplayer) + "'s Fleets"
+            Color 200,200,255
+            List(fleetlist,tab2x+10,tab2y+30,180,140)
+            If ListSelectionChanged(fleetlist) Then sel = -GetFleetId(GetListSelection(fleetlist))
+            If sel < 0 Then 
+                If fstats(-sel,1) = curplayer Then temppi = SelectListItemString(fleetlist,fleetname(-sel))
+            EndIf
+            bGeneralBack = button("Back",tab2x+20,tab2y+180,160,15,enabl)
+        ElseIf generaltabmode = 2 Then
+            Color 32,32,32
+            Text tab2x+10, tab2y+2, racename(curplayer) + "'s Solar Systems"
+            Color 200,200,255
+            List(starlist,tab2x+10,tab2y+30,180,140)
+            If ListSelectionChanged(starlist) Then sel = GetStarId(GetListSelection(starlist))            
+            If sel > 0 Then
+                If solowner(sel) = curplayer Then temppi = SelectListItemString(starlist,solname(sel))
+            EndIf
+            bGeneralBack = button("Back",tab2x+20,tab2y+180,160,15,enabl)
+        Else
+            Color 32,32,32
+            Text tab2x+10, tab2y+2, racename(curplayer)
+            Color 32,32,32
+            Text tab2x+20, tab2y+30, "Research Resources: " + RR(curplayer)
+            Text tab2x+20, tab2y+50, "Total Production: " + dec(totprod(curplayer),1)
+            If mouseover = 2 Then
+                bTechnology = button("Technology",tab2x+20,tab2y+80,160,25,enabl)
+                bDiplomacy  = button("Diplomacy",tab2x+20,tab2y+110,160,25,enabl)
+                bFleets     = button("Fleets",tab2x+20,tab2y+145,50,0,enabl)
+                bStars      = button("Stars",tab2x+75,tab2y+145,50,0,enabl)    
+                bReport     = button("Report",tab2x+130,tab2y+145,50,0,enabl)
+                bEndTurn    = button("End Turn",tab2x+20,tab2y+170,160,25,enabl)    
+            Else
+                DrawImage tab2buttons, tab2x, tab2y
+            EndIf
+        EndIf
+    EndIf
+End Function
+
+
+Function Tech()
+    PutTechsToList(techlist,curplayer)
+    SelectListItem(techlist,1)
+    bStart = 0
+    Repeat
+        If gScreensType Then 
+            DrawImage techbgFull, 0, 0
+        Else
+            Display(ON)
+            DrawImage techbg, 20, 20
+        EndIf
+        SetFont h1font
+        Color 10,10,10
+        Text 40,30,"Research"
+        SetFont normalfont
+        Text 30,60,"Available technologies for study"
+        Text 760-TextWidth("Research Resources: " + RR(curplayer)),60,"Research Resources: " + RR(curplayer)
+        Color 48,128,16
+        List(techlist,35,80,730,380)
+        Color 20,20,20
+        If ListItemsNo(techlist) = 0 Then
+            Text 40,465,"No more research projects available."
+        Else
+            techsel = getTechIdFromString(getListSelection(techlist))
+            SetFont h2font
+            Text 40,465,techs(techsel,1)
+            SetFont normalfont
+            st$ = "Start researching"
+            If researched(curplayer,techsel) < -STARTED/2 Then st$ = "Continue"
+            If researched(curplayer,techsel) > STARTED/2 Then st$ = "Stop"
+            bStart = button(st$,630,468,135,0)
+            Color 10,10,10
+            Text 40,485,"Estimated total cost: " + techs(techsel,4) + " RR"
+            temppi = CountResearchInProgress(curplayer)
+            If researched(curplayer,techsel) <= STARTED/2 Then temppi+1
+            If temppi = 0 Then RRperProj# = RR(curplayer) Else RRperProj# = RR(curplayer) / temppi
+            st$ = Str(RoundUp( (Float(techs(techsel,4))-researched(curplayer,techsel)) /RRperProj))
+            If RR(curplayer) = 0 Then st$ = "n/a"
+            Text 40,500,"Estimated remaining time: " + st$ + " years"
+            Text 40,515,"Details:"
+            Color 32,8,8
+            RowText(techs(techsel,3),40,450,530)
+        EndIf
+        bCloseTech = button("Close",w-190,h-55,160,25)
+        
+        If bStart Or KeyHit(cbKeyReturn) Or KeyHit(cbKeySpace) Then
+            techsel = getTechIdFromString(getListSelection(techlist))
+            selitem = ListSelection(techlist)
+            If researched(curplayer,techsel) > STARTED/2 Then
+                researched(curplayer,techsel) = -researched(curplayer,techsel)
+            ElseIf researched(curplayer,techsel) < -STARTED/2 Then
+                researched(curplayer,techsel) = -researched(curplayer,techsel)
+            Else
+                researched(curplayer,techsel) = STARTED
+            EndIf
+            PutTechsToList(techlist,curplayer)
+            SelectListItem(techlist,selitem)
+        EndIf
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Until bCloseTech Or KeyHit(1)
+    ClearKeys()
+End Function
+
+
+Function Diplomacy()
+    diplsel = curplayer
+    slid_spy = Min(5,totprod(curplayer))
+    Repeat
+        If gScreensType Then 
+            DrawImage diplbgFull, 0, 0
+        Else
+            Display(ON)
+            DrawImage diplbg, 20, 20
+        EndIf
+        SetFont h1font
+        Color 10,10,10
+        Text 40,30,"Diplomacy"
+        SetFont h2font
+        Color 32,32,32
+        Text 40,60,"Left click a race to view relationships"
+        Text 40,80,"Right click to compose a message"
+        SetFont normalfont
+        
+        theta# = 360.0 / numPlayers
+        For i = 1 To numPlayers
+            hiw = ImageWidth(racepics(racepic(i,0)))/2
+            hih = ImageHeight(racepics(racepic(i,0)))/2
+            a# = (i-1) * theta + 90
+            racepic(i,1) = halfw + Cos(a)*150
+            racepic(i,2) = halfh - Sin(a)*150
+            If relations(curplayer,i) <> 0 Then
+                If diplsel = i Then
+                    For j = 1 To numPlayers
+                        If i<>j And relations(i,j) <> 0 Then
+                            If relations(i,j) = 1 Then  Color 64,64,64
+                            If relations(i,j) = -1 Then Color cbOrange
+                            If relations(i,j) = -2 Then Color cbRed
+                            If relations(i,j) = 2 Then  Color cbDarkBlue
+                            If relations(i,j) = 3 Then  Color cbGreen
+                            ta = GetAngle(racepic(i,1),racepic(i,2),racepic(j,1),racepic(j,2))
+                            FatLine(racepic(i,1)+Cos(ta)*hiw, racepic(i,2)-Sin(ta)*hih,  racepic(j,1)+Cos(ta+180)*hiw, racepic(j,2)-Sin(ta+180)*hih,3)
+                        EndIf
+                    Next j
+                    Color cbYellow
+                    Box racepic(i,1)-hiw,racepic(i,2)-hih,2*hiw,2*hih,ON
+                    
+                    If diplsel <> curplayer Then
+                        SetFont normalfont
+                        Color 0,0,32
+                        Text 30,400,"You can try to steal"
+                        Text 30,412,"research from "+racename(diplsel)
+                        bSpyTech = button("Steal Technologies",30,427,160,18)
+                        Color 0,0,32
+                        Text 30,450,"You can try to spy how"
+                        Text 30,462,"technologically advanced"
+                        Text 30,474,racename(diplsel)+" is"
+                        bSpyTechStatus = button("Spy Technology Levels",30,489,160,18)
+                        Color 0,0,32
+                        Text 30,518,"How much of your total production resources are you willing to use?"
+                        Text 30,555,"The more you spend, the lower the risk of being caught will be."
+                        slid_spy = slider(30,535,300,16,totprod(curplayer),slid_spy,1,1)
+                    EndIf
+                EndIf
+                DrawImage racepics(racepic(i,0)),racepic(i,1),racepic(i,2)
+
+                If Distance(MouseX(),MouseY(),racepic(i,1),racepic(i,2)) < 28 Then
+                    SetFont h2font : Color cbDarkGreen
+                    Text MouseX()+ImageWidth(cursor)/2,MouseY()+ImageHeight(cursor)/2,racename(i)
+                    If MouseHit(1) Then diplsel = i
+                    If MouseHit(2) And i<>curplayer Then diplsel = i: TradeScreen(diplsel)
+                EndIf
+            Else
+                If i = curplayer Then
+                    DrawImage racepic(i,0),racepic(i,1),racepic(i,2)
+                    If Distance(MouseX(),MouseY(),racepic(i,1),racepic(i,2)) < 28 Then
+                        SetFont h2font : Color cbDarkGreen
+                        Text MouseX()+ImageWidth(cursor)/2,MouseY()+ImageHeight(cursor)/2,racename(i)
+                    EndIf
+                Else
+                    DrawImage racepics(0),racepic(i,1),racepic(i,2)
+                    If Distance(MouseX(),MouseY(),racepic(i,1),racepic(i,2)) < 28 Then
+                        SetFont h2font : Color cbDarkGreen
+                        Text MouseX()+ImageWidth(cursor)/2,MouseY()+ImageHeight(cursor)/2,"Unknown"
+                    EndIf
+                EndIf
+            EndIf
+        Next i
+        SetFont normalfont
+        bCloseDipl = button("Close",w-190,h-55,160,25)
+        
+        If slid_spy => 1 Then
+            If bSpyTech Then
+                SpyTechnology(diplsel,slid_spy)
+                bCloseDipl=1
+                bSpyTech=0
+            ElseIf bSpyTechStatus Then
+                costs = costs + slid_spy
+                randi = Rand(1,8)
+                diff# = 0
+                st$   = ""
+                Select randi
+                    Case 1
+                        diff = attbonus(curplayer) - attbonus(diplsel)
+                        st = "attack technology"
+                    Case 2
+                        diff = defbonus(curplayer) - defbonus(diplsel)
+                        st = "defence technology"
+                    Case 3
+                        diff = groundatt(curplayer) - groundatt(diplsel)
+                        st = "colonist attack technology"
+                    Case 4
+                        diff = grounddef(curplayer) - grounddef(diplsel)
+                        st = "colonist defence technology"
+                    Case 5
+                        diff = speed(curplayer) - speed(diplsel)
+                        st = "propulsion speed technology"
+                    Case 6
+                        diff = maxdist(curplayer) - maxdist(diplsel)
+                        st = "propulsion distance technology"
+                    Case 7
+                        diff = prodbonus(curplayer) - prodbonus(diplsel)
+                        st = "production technology"
+                    Case 8
+                        diff = popgrowth(curplayer) - popgrowth(diplsel)
+                        st = "ecology technology"
+                EndSelect
+                If diff > 0 Then
+                    temp = MsgBox("Spies report that you have "+differencestrings(RoundUp(Min(diff*5,6)))+" level in "+st+".")
+                ElseIf diff < 0 Then
+                    temp = MsgBox("Spies report that they have "+differencestrings(RoundUp(Min(Abs(diff)*5,6)))+" level in "+st+".")
+                Else
+                    temp = MsgBox("Spies report that you are in the same level in "+st+".")
+                EndIf
+                If Rnd(1) > .9 Or Rand(1,40) => slid_spy Then
+                    temp = MsgBox("Your spies were caught...")
+                    AddReport("Spy caught","A "+racename(curplayer)+" spy in system "+solname(sel)+" has been caught after transmitting some delicate data.",solowner(sel),Str(sel))
+                    If aiflag(solowner(sel)) = 1 Then
+                        ResetDiplMessage()
+                        UpdateDiplMessage("Stop of espionage",2)
+                        UpdateDiplMessage("Declare war",3)
+                        WriteDiplMsg(solowner(sel),curplayer)
+                    EndIf
+                EndIf
+                bCloseDipl=1
+                bSpyTechStatus=0
+            EndIf
+        EndIf
+        
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Until bCloseDipl Or KeyHit(1)
+    ClearKeys()
+End Function
+
+
+Function TradeScreen(diplsel)
+    UpdateTradeLists(curplayer,diplsel)
+    ResetDiplMessage()
+    CheckRadioButton(1,2)
+    Repeat
+        If gScreensType Then 
+            DrawImage diplbgFull, 0, 0
+        Else
+            Display(ON)
+            DrawImage diplbg, 20, 20
+        EndIf
+        SetFont h1font
+        Color 48,48,48
+        Text 30,30,"Communication"
+        SetFont h2font
+        Color 20,20,20
+        Text 40,60,racename(diplsel)
+        DrawImage racepics(racepic(diplsel,0)),40+ImageWidth(racepics(racepic(diplsel,0)))/2,80+ImageWidth(racepics(racepic(diplsel,0)))/2
+        SetFont normalfont
+        Color 10,10,10
+        Text 30,260, "I offer..."
+        Text 280,260,"I request..."
+        Text 530,260,"I threat with..."
+        Color 128,200,128
+        List(givelist,30,280,240,250)
+        Color 128,128,200
+        List(requestlist,280,280,240,250)
+        Color 200,96,96
+        List(threatlist,530,280,240,250)
+        Color 10,10,10
+        Text 30,550,"Tone:"
+        RadioButton("Pleading",100,550,1,1)
+        RadioButton("Neutral",200,550,1,2)
+        RadioButton("Demanding",300,550,1,3)
+        Color 120,0,0
+        SetFont h2font
+        RowText(GetDiplMessage(checked_xpradio(1)),210,770,60)
+        SetFont normalfont
+        bAddOffer   = button("Add",212,259,60,0)
+        bAddRequest = button("Add",462,259,60,0)
+        bAddThreat  = button("Add",712,259,60,0)
+        If GetWord(GetDiplMessage(checked_xpradio(1)),1) <> "Add" Then bSendDiplMsg = button("Send Message",40,170,100,20): bClear = button("Clear",40,195,100,20)
+        bCloseTrade = button("Cancel",w-190,h-55,160,25)
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+        
+        If bAddOffer    Then UpdateDiplMessage(getListSelection(givelist)   ,1)
+        If bAddRequest  Then UpdateDiplMessage(getListSelection(requestlist),2)
+        If bAddThreat   Then UpdateDiplMessage(getListSelection(threatlist) ,3)
+        If bClear       Then ResetDiplMessage():bClear=0
+        If bSendDiplMsg Then
+            WriteDiplMsg(curplayer,diplsel,checked_xpradio(1))
+            bCloseTrade = True
+        EndIf
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+    Until bCloseTrade Or KeyHit(1)
+    ClearKeys()
+End Function
+
+
+Function SaboteurScreen()
+    slid_sabo = Min(5,totprod(curplayer))
+    Repeat
+        If gScreensType Then 
+            DrawImage diplbgFull, 0, 0
+        Else
+            Display(ON)
+            DrawImage diplbg, 20, 20
+        EndIf
+        SetFont h1font
+        Color 32,32,48
+        Text 40,30,"Hire Saboteurs"
+        SetFont h2font
+        Color 0,0,-racecolor(solowner(sel))
+        Text 40,60,solname(sel)
+        DrawImage imgbigstar(Int(sol(sel,7))),40,80
+        SetFont normalfont
+        Text 50,235,racename(solowner(sel))
+        Color 10,10,10
+        Text 45,220,"Inhabited by:"
+        DrawImage racepics(racepic(solowner(sel),0)),45+ImageWidth(racepics(racepic(solowner(sel),0)))/2,250+ImageWidth(racepics(racepic(solowner(sel),0)))/2
+        CenterText halfw,122,"Attempts to destroy both ships and cannons"
+        CenterText halfw,172,"Focuses sabotaging on ships"
+        CenterText halfw,222,"Focuses sabotaging on cannons"
+        CenterText halfw,272,"Attempts to reduce population (by e.g. poisoning food etc.)"
+        CenterText halfw,322,"Attempts to reduce the maximum population (by e.g. releasing hazardous waste into the environment"
+        CenterText halfw,430,"How much of your total production resources are you willing to use?"
+        CenterText halfw,470,"The less you spend, the smaller the effects will be and the risk of being caught increases"
+        bSaboMilitary = button("Sabotage Military",300,100,200,20)
+        bSaboShips    = button("Sabotage Ships",300,150,200,20)
+        bSaboCanns    = button("Sabotage Cannons",300,200,200,20)
+        bSaboPop      = button("Sabotage Population",300,250,200,20)
+        bSaboEco      = button("Sabotage Environment",300,300,200,20)
+        bCancelSabot  = button("Cancel",w-190,h-55,160,25)
+        slid_sabo     = slider(200,450,400,16,totprod(curplayer),slid_sabo,1,1)
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+        
+        If slid_sabo => 1 Then
+            If bSaboMilitary Then ParseSabotageEffect(1,sel,slid_sabo): bCancelSabot = True
+            If bSaboShips    Then ParseSabotageEffect(2,sel,slid_sabo): bCancelSabot = True
+            If bSaboCanns    Then ParseSabotageEffect(3,sel,slid_sabo): bCancelSabot = True
+            If bSaboPop      Then ParseSabotageEffect(4,sel,slid_sabo): bCancelSabot = True
+            If bSaboEco      Then ParseSabotageEffect(5,sel,slid_sabo): bCancelSabot = True
+        EndIf
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+    Until bCancelSabot Or KeyHit(1)
+    ClearKeys()
+    UpdateTotProd(curplayer)
+End Function
+
+
+
+    // Fleet operations
+    
+Function NewFleet(_owner,_dest,_ships,_colons,_sol,_human=1)
+    For i = 1 To fleets+1
+        If fstats(i,1) = 0 Then Exit
+    Next i
+    If i > fleets Then fleets + 1
+    defname$ = "Fleet " + Left(racename(_owner),3) + Str(Rand(100,999))
+    If _human = 1 Then fleetname(i) = InputBox("Enter a name for the fleet:", defname$)
+    If fleetname(i) = "" Then fleetname(i) = defname$
+    
+    ships(_sol) = ships(_sol) - _ships
+    pop(_sol)   = pop(_sol) - _colons
+    fstats(i,0) = i
+    fstats(i,1) = _owner
+    fstats(i,2) = _dest
+    fstats(i,3) = _ships
+    fstats(i,4) = _colons
+    fstats(i,5) = maxdist(_owner)
+    fleet(i,0)  = -i
+    fleet(i,1)  = sol(_sol,1)
+    fleet(i,2)  = sol(_sol,2)
+    fleet(i,3)  = sol(_sol,3)
+    fleet(i,7)  = 0
+    If _human Then
+        dest        = 0
+        selDest     = False
+        bAcceptDest = False
+        AddListItem(fleetlist,fleetname(i))
+        SortList(fleetlist)
+    EndIf
+    calcstars = True
+    numsendships = 0
+    numsendcolons = 0
+End Function
+
+
+
+Function LandFleet(id,_human=1)
+    ShowMouse OFF
+    target = fstats(id,2)
+    If fstats(id,2) <> 0 And Distance3d(fleet(id,1),fleet(id,2),fleet(id,3), sol(fstats(id,2),1),sol(fstats(id,2),2),sol(fstats(id,2),3)) < 1 Then
+        If solowner(fstats(id,2)) = fstats(id,1) Then
+            ships(fstats(id,2)) = ships(fstats(id,2)) + fstats(id,3)
+            pop(fstats(id,2)) = pop(fstats(id,2)) + fstats(id,4)
+            If pop(fstats(id,2)) > maxpop(fstats(id,2)) Then pop(fstats(id,2)) = maxpop(fstats(id,2))
+        ElseIf solowner(fstats(id,2)) = 0 Then
+            solowner(fstats(id,2)) = fstats(id,1)
+            ships(fstats(id,2)) = ships(fstats(id,2)) + fstats(id,3)
+            pop(fstats(id,2)) = pop(fstats(id,2)) + fstats(id,4)
+            If pop(fstats(id,2)) > maxpop(fstats(id,2)) Then pop(fstats(id,2)) = maxpop(fstats(id,2))
+            defname$ = solname(target)
+            If _human = 1 Then solname(target) = InputBox("Enter a name for the solar system:", defname$)
+            If solname(target) = "" Then solname(target) = defname$
+            If _human = 1 Then
+                AddListItem(starlist,solname(target))
+                SortList(starlist)
+            EndIf
+            AddGenericReport(solname(target),"claimed",fstats(id,1),Str(target))
+        Else
+            Repeat
+                If RoundDown(ships(target)) <= 0 And RoundDown(canns(target)) <= 0 Then Exit
+                If _human' Or aiflag(solowner(target))=0 Then
+                    ShowBattleMessage("Battle in progress",id,target)
+                EndIf
+                attkills = RoundUp(fstats(id,3) * Rnd(1) * Max(0,(1.0+attbonus(curplayer)-defbonus(solowner(target)))) )
+                fstats(id,3) = fstats(id,3) - RoundUp((ships(target)+canns(target)) * Rnd(1) * Max(0,(1.0+attbonus(solowner(target))-defbonus(curplayer))))
+                ships(target) = ships(target) - attkills
+                If ships(target) < 1 Then canns(target) = canns(target) + ships(target): ships(target) = 0
+                If canns(target) < 1 Then canns(target) = 0
+                If fstats(id,3) <= 0 Then 
+                    AddGenericReport(solname(target),"failed",fstats(id,1),Str(target))
+                    AddReport("Victorious defence", "You have succesfully defended the "+solname(target)+" system against "+racename(fstats(id,1))+" invasion.", solowner(target), _link$)
+                    If _human = 1 Then ShowBattleMessage("Attacker lost the battle.",id,target)
+                    Goto exfi
+                EndIf
+                If RoundDown(ships(target)) <= 0 And RoundDown(canns(target)) <= 0 Then Exit
+            Forever
+            ships(target) = 0: canns(target) = 0
+            If _human' Or aiflag(solowner(target))=0 Then
+                DrawInvasionStatus(id,target)
+                SetFont h1font
+                Color cbOrange
+                Text 50,380,"Opposition in space has been destroyed."
+                Text 50,400,"Starting invasion, prepare for ground combat!"
+                Color cbDarkGreen
+                Text 60,420,"Press any key..."            
+                DrawScreen
+                WaitKey
+            EndIf
+            Repeat
+                If _human' Or aiflag(solowner(target))=0 Then
+                    ShowBattleMessage("Combat in progress",id,target,1)
+                EndIf
+                attkills = RoundUp((fstats(id,3) + fstats(id,4) * Rnd(1) * Max(0,(1.0+groundatt(curplayer)-grounddef(solowner(target)))) ))
+                fstats(id,4) = fstats(id,4) - RoundUp((pop(target)) * Rnd(1) * Max(0,(1.0+groundatt(solowner(target))-grounddef(curplayer))))
+                pop(target) = pop(target) - attkills
+                If fstats(id,4) <= 0 Then
+                    AddGenericReport(solname(target),"failed",fstats(id,1),Str(target))
+                    AddReport("Victorious defence", "You have succesfully defended the "+solname(target)+" system against "+racename(fstats(id,1))+" invasion.", solowner(target), _link$)
+                    If _human = 1 Then ShowBattleMessage("Attacking forces were wiped out and the invasion failed.",id,target,1)
+                    Goto exfi
+                EndIf
+                If pop(target) <= 0 Then Exit
+            Forever
+            pop(target) = 0
+            If fstats(id,4) > 0 Then
+                If _human = 1 Then ShowBattleMessage("Victory! " + solname(target) + " now belongs to you!",id,target,1)
+                solowner(target) = fstats(id,1)
+                ships(target) = fstats(id,3)
+                If ships(target) < 0 Then ships(target) = 0
+                pop(target) = fstats(id,4)
+                If pop(target) > maxpop(target) Then pop(target) = maxpop(target)
+                defname$ = solname(target)
+                If _human = 1 Then solname(target) = InputBox("Enter a name for the solar system:", defname$)
+                If solname(target) = "" Then solname(target) = defname$
+                UpdateGeneralLists(solowner(target))
+                AddGenericReport(solname(target),"conquered",fstats(id,1),Str(target))
+                AddReport("System lost", racename(fstats(id,1))+" has invaded the "+solname(target)+" system!", solowner(target), _link$)
+            Else
+                solowner(target) = 0
+                If _human = 1 Then ShowBattleMessage("You defeated the enemy, but your forces were destroyed too.",id,target,1)
+                AddGenericReport(solname(target),"failed",fstats(id,1),Str(target))
+                AddReport("System lost", "You have lost system "+solname(target)+"!", solowner(target), _link$)
+            EndIf
+        EndIf
+        exfi:
+        DeleteListItemString(fleetlist,fleetname(id))
+        SortList(fleetlist)
+        fstats(id,1) = 0
+        fstats(id,3) = 0
+        fstats(id,4) = 0
+        fstats(id,5) = 0
+        fleet(id,0)  = 0
+        fleet(id,1)  = 0
+        fleet(id,2)  = 0
+        fleet(id,3)  = 0
+        fleetname(id) = ""
+        If _human Then
+            sel = fstats(id,2)
+            bLand = 0
+        EndIf
+        fstats(id,2) = 0
+        calcstars = True
+    EndIf
+    ShowMouse cursor
+End Function
+
+
+Function DrawInvasionStatus(_fleet,_sol,_ground=0)
+    DrawImage atmosphere,0,0
+    SetFont h1font
+    Color 196,196,196
+    If _ground=0 Then Text 40,40,"Battle at the orbit of "+solname(_sol) Else Text 40,40,"Invasion at "+solname(_sol)
+    SetFont h2font
+    Color cbBlue
+    Text 100,100+(_ground*150),"Attacking forces - "+racename(fstats(_fleet,1))
+    Text 120,130+(_ground*150),"Starships: " + RoundDown(fstats(_fleet,3))
+    Text 120,150+(_ground*150),"Colonists: " + dec(fstats(_fleet,4),1) + " millions"
+    Color cbRed
+    Text 400,200+(_ground*50),"Defending forces - "+racename(solowner(_sol))
+    Text 420,230+(_ground*50),"Starships: " + RoundDown(ships(_sol))
+    Text 420,250+(_ground*50),"Cannons:   " + RoundDown(canns(_sol))
+    Text 420,270+(_ground*50),"Colonists: " + dec(pop(_sol),1) + " millions"
+End Function
+
+
+Function ShowBattleMessage(_msg$,_fleet,_sol,_ground=0)
+    DrawInvasionStatus(_fleet,_sol,_ground)
+    SetFont h1font
+    Color cbOrange
+    Text 50,380,_msg
+    Color cbDarkGreen
+    Text 60,420,"Press any key..."
+    DrawScreen
+    WaitKey
+End Function
+
+
+Function AI(pl)
+    For i = 1 To maxsols
+        ai_travelling(i) = 0
+    Next i
+    // Fleets
+    For i = 1 To fleets
+        If fstats(i,1) = pl Then
+            dist2dest = Distance3d(fleet(i,1),fleet(i,2),fleet(i,3), sol(fstats(i,2),1),sol(fstats(i,2),2),sol(fstats(i,2),3))
+            If dist2dest < 1 Then LandFleet(i,False) Else ai_travelling(fstats(i,2)) = 1
+        EndIf
+    Next i
+    // Solar Systems
+    For i = 1 To maxsols
+        If solowner(i) = pl Then
+            // Economy
+            slid_tech(i)  = 100 * (1-ai_act(pl))                        * Rnd(.95,1.05)
+            slid_eco(i)   = Min(Max(100 * .25 * 1.2*(2-ai_act(pl))          * Rnd(1.0,1.05), 26), 100)
+            slid_ships(i) = 100 * .33333 * (2*ai_act(pl)+ai_mil(pl))    * Rnd(.95,1.05)
+            slid_defe(i)  = 100 * .10 * (4*(1-ai_act(pl))+ai_mil(pl))   * Rnd(.95,1.05)
+            If pop(i) => maxpop(i)-1 Then slid_eco(i) = 25
+            If pop(i) < maxpop(i)*.4 or pop(i) < 10 Then slid_eco(i) = 100
+            
+            // Exploration
+            If ships(i) => 1 Then
+                target = GetNearbyStar(i,0)
+                If target <> 0 Then             'empty system
+                    If Rnd(1) < ai_act(pl) And ai_travelling(target) = 0 And pop(i) => 20 Then
+                        NewFleet(pl,target,Rand(1,ships(i)),Rnd(pop(i)*.1,pop(i)*.6),i,False)
+                    EndIf
+                Else                            'hostile system
+                    target = GetNearbyStar(i,1)
+                    If target <> 0 Then
+                        If Rnd(1) < ai_act(pl) And Rnd(1) < ai_mil(pl) And ships(i) => 10 And pop(i) => 50 Then
+                            NewFleet(pl,target,Rand(ships(i)*.9,ships(i)),Rnd(pop(i)*.7,pop(i)*.8),i,False)
+                        EndIf                    
+                    ElseIf CountResearchInProgress(pl) < 2 Then
+                        proj = GetRandTech(pl,3)
+                        If proj <> 0 Then researched(pl,proj) = STARTED: AddLog("Player "+pl+" started researching "+techs(proj,1))
+                    EndIf
+                EndIf
+            Else 
+                If Rnd(1) < ai_act(pl) Then slid_ships(i) = slid_ships(i) * 1.5
+            EndIf
+
+            // Normalize economy sliders
+            slidsum#      = Max(slid_tech(i)+slid_ships(i)+slid_defe(i), 1)
+            slid_tech(i)  = Min(slid_tech(i) /slidsum#*(200.0-slid_eco(i)),100.0)
+            slid_ships(i) = Min(slid_ships(i)/slidsum#*(200.0-slid_eco(i)),100.0)
+            slid_defe(i)  = Min(slid_defe(i) /slidsum#*(200.0-slid_eco(i)),100.0)
+        ElseIf solowner(i) > 0 Then
+            // Sabotage
+            If ( sol(i,9) = False And totprod(pl) > 30 ) And ( (Rnd(1) < ai_mil(pl) And relations(pl,solowner(i)) < 0) Or (Rnd(1) < ai_mil(pl) And Rnd(1) < ai_loy(pl)*1.5 And relations(pl,solowner(i)) = 0) ) Then
+                ParseSabotageEffect(Rand(1,5),i,Rand(5,totprod(pl)/2),OFF)
+                AddLog(racename(pl)+" (player "+pl+") sabotaged system "+solname(i)+" (id "+i+")")
+            EndIf
+        EndIf
+    Next i
+    // Tech Spying
+    For i = 1 To maxplayers
+        If totprod(pl) > 40 And ( (relations(pl,solowner(i)) < 0 And Rnd(1) > ai_loy(pl)) Or (relations(pl,solowner(i)) = 0 And Rnd(1) > ai_loy(pl)*1.5) ) Then
+            SpyTechnology(i,Rand(5,totprod(pl)/2),OFF)
+            AddLog(racename(pl)+" (player "+pl+") spied technology from "+racename(i)+" (id "+i+")")
+        EndIf
+    Next i
+    // Research
+    If CountResearchInProgress(pl) = 0 Then
+        projtype = (Not(Rnd(1) < ai_mil(pl)))+1
+        proj = GetRandTech(projtype,pl)
+        If proj <> 0 Then researched(pl,proj) = STARTED: AddLog("Player "+pl+" started researching "+techs(proj,1))
+    EndIf
+    // Report reactions
+    'For i = 1 To Int(reports(pl,0,0))
+    '    If reports(pl,i,1) = 
+    'Next i
+End Function
+
+
+Function MsgAI(_sender,_tone)
+    If Int(diplmsg(0,1,0)) > 0 And Int(diplmsg(0,2,0)) = 0 Then Return True
+    If relations(_sender,curplayer) <= -2 Then Return False 
+    If Int(diplmsg(0,1,0)) = 0 And Int(diplmsg(0,2,0)) > 0 Then
+        If relations(_sender,curplayer) => 3 And _tone <> 3 And Rand(1,3)=1 Then Return True Else Return False
+    EndIf
+    If Int(diplmsg(0,1,0)) = 0 And Int(diplmsg(0,2,0)) = 0 And Int(diplmsg(0,3,0)) > 0 Then Return Rand(0,1)
+    
+    value = (relations(_sender,curplayer)-1) * 2
+    For i = 1 To Int(diplmsg(0,1,0))
+        If GetWord(diplmsg(i,1,1),1) = "Ship" Then value = value + Int(diplmsg(i,1,0))
+        If GetWord(diplmsg(i,1,1),1) = "System" Then value = value + 8
+        If GetWord(diplmsg(i,1,1),1) = "Tech:" Then value = value + 3
+        If GetWord(diplmsg(i,1,1),1) = "Alliance" Then value = value + 3
+        If GetWord(diplmsg(i,1,1),1) = "Non-aggression treaty" Then value = value + 2
+    Next i
+    For i = 1 To Int(diplmsg(0,2,0))
+        If GetWord(diplmsg(i,1,1),1) = "Ship" Then value = value - Int(diplmsg(i,1,0))
+        If GetWord(diplmsg(i,1,1),1) = "System" Then value = value - 8
+        If GetWord(diplmsg(i,1,1),1) = "Tech:" Then value = value - 3
+        If GetWord(diplmsg(i,1,1),1) = "Alliance" Then value = value - 3
+        If GetWord(diplmsg(i,1,1),1) = "Non-aggression treaty" Then value = value - 2
+    Next i 
+
+    Return (value>0)
+End Function
+
+
+
+Function NEXTTURN()
+
+    AddLog("#### Ending Turn ####")
+
+    FormatReports(curplayer)
+    UpdateTotProd(curplayer)
+    UpdateRR(curplayer)
+    If racename(curplayer) <> "" And CountResearchInProgress(curplayer) > 0 Then
+        RRperProj# = RR(curplayer) / CountResearchInProgress(curplayer)
+        For t = 1 To numTechs
+            If researched(curplayer,t) > STARTED/2 And researched(curplayer,t) < READY-1 Then
+                researched(curplayer,t) = researched(curplayer,t) + ( RRperProj * Rnd(0.5,1.5) )
+                RR(curplayer) = RR(curplayer) - RRperProj
+                If researched(curplayer,t) => Float(techs(t,4)) Then researched(curplayer,t) = READY: ParseTechEffect(t,curplayer): AddGenericReport(techs(t,1),"research",curplayer,"research")
+                If CountResearchInProgress(curplayer) = 0 Then AddReport("No research in progress","Currently there are no research projects in progress. Research resources are being wasted.",curplayer,"research")
+                AddLog("Player "+curplayer+" - "+techs(t,1)+" - status: "+researched(curplayer,t))+"/"+techs(t,4)
+            EndIf
+        Next t
+    EndIf
+
+    selDest = False
+    For i = 1 To maxsols
+        If solowner(i) = curplayer Then
+            If POP(i) < maxpop(i) Then
+                POP(i) = Max(0,  Min(maxpop(i), POP(i)+getPopIncrease(i) ))
+                If POP(i) = maxpop(i) Then AddReport("Maximum population reached","The population in "+solname(i)+" system has reached its maximum!",solowner(i),Str(i))
+            EndIf
+            oldships = RoundDown(ships(i)): oldcanns = RoundDown(canns(i))
+            ships(i) = ships(i) + slid_ships(i) / 100.0 * prodres(i) / 50.0
+            canns(i) = canns(i) + slid_defe(i) / 100.0 * prodres(i) / 20.0
+            If oldships < RoundDown(ships(i)) Then AddGenericReport(solname(i),"newship",solowner(i),Str(i))
+            If oldcanns < RoundDown(canns(i)) Then AddGenericReport(solname(i),"newcann",solowner(i),Str(i))
+        EndIf
+        If spies(curplayer,i) > 0 Then spies(curplayer,i) = 0
+            'If Rand(0,1) = 0 Then
+                'spies(curplayer,i) = spies(curplayer,i) - 1
+                'AddReport("Spy got caught","You spy in system "+solname(i)+" got caught!",curplayer,Str(i))
+                'AddReport("Spy caught","A "+racename(curplayer)+" spy in system "+solname(i)+" has been caught.",solowner(i),Str(i))
+            'EndIf
+        'EndIf
+    Next i
+    UpdateTotProd(curplayer)
+    UpdateRR(curplayer)
+    
+    For i = 1 To fleets
+        If fstats(i,1) = curplayer Then
+            If fstats(i,2) <> 0 Then
+                dist2dest = Distance3d(fleet(i,1),fleet(i,2),fleet(i,3), sol(fstats(i,2),1),sol(fstats(i,2),2),sol(fstats(i,2),3))                
+                'AddLog("Fleet - dist2dest: "+dist2dest+" Coords: "+fleet(i,1)+","+fleet(i,2)+","+fleet(i,3))
+                If dist2dest > speed(fstats(i,1)) Then
+                    fleet(i,1)  = fleet(i,1) + (sol(fstats(i,2),1) - fleet(i,1)) / Float(dist2dest) * speed(fstats(i,1))
+                    fleet(i,2)  = fleet(i,2) + (sol(fstats(i,2),2) - fleet(i,2)) / Float(dist2dest) * speed(fstats(i,1))
+                    fleet(i,3)  = fleet(i,3) + (sol(fstats(i,2),3) - fleet(i,3)) / Float(dist2dest) * speed(fstats(i,1))
+                    'AddLog(" Coord modifiers: "+Str((sol(fstats(i,2),1) - fleet(i,1)) / Float(dist2dest) * speed(fstats(i,1)))+","+Str((sol(fstats(i,2),2) - fleet(i,2)) / Float(dist2dest) * speed(fstats(i,1)))+","+Str((sol(fstats(i,2),3) - fleet(i,3)) / Float(dist2dest) * speed(fstats(i,1))))
+                    'AddLog(" New coords: "+fleet(i,1)+","+fleet(i,2)+","+fleet(i,3))
+                    fstats(i,5) = fstats(i,5) - speed(fstats(i,1))
+                    calcstars   = True
+                ElseIf dist2dest => 1 Then
+                    fleet(i,1)  = sol(fstats(i,2),1)
+                    fleet(i,2)  = sol(fstats(i,2),2)
+                    fleet(i,3)  = sol(fstats(i,2),3)
+                    If solowner(fstats(i,2)) = fstats(i,1) Then fstats(i,5) = maxdist(fstats(i,1))
+                    calcstars   = True
+                    AddGenericReport(fleetname(i),"reached",fstats(i,1),Str(-i))
+                EndIf
+            EndIf
+        EndIf
+    Next i
+
+    UpdateKnownRaces()
+    
+    costs = 0
+    curplayer+1
+    If curplayer > numPlayers Then curplayer = 1
+    AddLog("#### Next Turn of Player "+curplayer+" ("+racename(curplayer)+") ####")
+    UpdateKnownSpace(curplayer)
+    
+    // Winning condition: kill all
+    If CountAliveRaces() = 0 Then
+        temp = MsgBox("All races have died away...")
+        Menu(1)
+        MainLoop()
+    ElseIf CountAliveRaces() = 1 Then
+        temp = MsgBox("Only the race of "+racename(getWinner(1))+" remains alive. Game Over.")
+        Menu(1)
+        MainLoop()
+    EndIf
+    
+    If aiflag(curplayer) Then
+        If FileExists(messagesfile) Then HandleMessages(curplayer)
+        ai(curplayer)
+        NextTurn()
+    Else
+        If password(curplayer) = "" And CountHumans() > 1 Then PromtForPassword(curplayer) Else temp = Verify()
+        UpdateGeneralLists(curplayer)
+        If FileExists(messagesfile) Then HandleMessages(curplayer)
+        If Int(reports(curplayer,0,0)) > 0 Then AnnualReport()
+    EndIf
+End Function
+
+
+Function AnnualReport()
+    PutReportsToList(curplayer,reportlist)
+    SelectListItem(reportlist,1)
+    Repeat
+        DrawImage reportbg, 0, 0
+        SetFont h1font
+        Color 10,10,10
+        Text 20,10,"Annual Report"
+        Color 208,176,0
+        SetFont normalfont
+        Text 580,40,"Events"
+        Color 255,230,128
+        List(reportlist,580,55,200,300)
+        SetFont h2font
+        Color 32,32,32
+        If ListItemsNo(reportlist) = 0 Then
+            Text 40,40,"No events..."
+        Else
+            Text 60,400,GetListSelection(reportlist)
+            Color cbOrange 
+            SetFont normalfont
+            RowText(reports(curplayer,ListSelection(reportlist),2),80,500,420)
+            If reports(curplayer,ListSelection(reportlist),0) <> "" Then bGoto = button("GoTo",500,400,50,0)
+        EndIf
+        SetFont normalfont
+        bCloseReport = button("Close",w-180,h-30,160,25)
+        If bGoto Then
+            If reports(curplayer,ListSelection(reportlist),0) = "research" Then Tech()
+            If reports(curplayer,ListSelection(reportlist),0) = "diplomacy" Then Diplomacy()
+            If Int(reports(curplayer,ListSelection(reportlist),0)) > 0 Then sel = Int(reports(curplayer,ListSelection(reportlist),0))
+            If Int(reports(curplayer,ListSelection(reportlist),0)) < 0 Then
+                If fstats(-Int(reports(curplayer,ListSelection(reportlist),0)),1) <> 0 Then sel = Int(reports(curplayer,ListSelection(reportlist),0))
+            EndIf
+            bCloseReport = True
+        EndIf
+        
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Until bCloseReport Or KeyHit(1)
+    ClearKeys()
+End Function
+
+
+Function Message(_sender,_tone=2)
+    If aiflag(curplayer) Then Return MsgAI(_sender,_tone)
+    ClearKeys()
+    Repeat
+        DrawImage reportbg, 0, 0
+        SetFont h1font
+        Color 10,10,10
+        Text 20,10,"Message"
+        SetFont h2font
+        Color 32,32,32
+        Text 40,40,"You have received a message from "+racename(_sender)
+        DrawImage racepics(racepic(_sender,0)),30+ImageWidth(racepics(racepic(_sender,0)))/2,60+ImageWidth(racepics(racepic(_sender,0)))/2
+        Color 120,0,0
+        SetFont h2font
+        RowText(GetDiplMessage(_tone),150,650,120)
+        SetFont normalfont
+
+        If button("Accept",200,400,150,20) Or KeyHit(cbkeyReturn) Then Return 1
+        If button("Reject",450,400,150,20) Or KeyHit(1) Then Return 0
+        
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Forever
+End Function
+
+
+Function Verify()
+    If CountHumans() <= 1 Then Return 1
+    pswd$ = InputBox("Enter password for "+racename(curplayer),"","*")
+    If pswd$ = password(curplayer) Then Return 1
+    If pswd$ = "" Then Menu()
+    Verify()
+End Function
+
+Function PromtForPassword(pl)
+    pwd1$ = InputBox("Choose a password for "+racename(pl),"","*")
+    If pwd1 <> "" Then 
+        pwd2$ = InputBox("Re-enter the password","","*")
+        If pwd1 <> pwd2 Then PromtForPassword(pl) Else password(pl) = pwd1
+    EndIf
+End Function
+
+
+
+Function SaveLoadScreen(_save=1)
+    FormatList(saveloadlist)
+    curdir$ = CurrentDir()
+    ChDir savedir
+    StartSearch
+        Repeat
+            file$=FindFile()
+            If file$="" Then Exit
+            If Lower(Right(file$,4))=".sav" Then
+                AddListItem(saveloadlist,Mid(file$,1,Len(file$)-4))
+            EndIf
+        Forever
+    EndSearch
+    ChDir curdir$
+    savename$ = "10000"
+    Repeat
+        DrawImage saveloadbg, 0, 0
+        SetFont h1font
+        Color 10,10,10
+        If _save = 1 Then Text 20,10,"Save Game" Else Text 20,10,"Load Game"
+        Color 16,16,96
+        SetFont h2font
+        Text 40,40,"Select a name from the list"
+        Text 40,55,"or type it in the box below"
+        SetFont normalfont
+        Color 96,96,196
+        Text 300,85,"Available saves"
+        Color 100,100,255
+        List(saveloadlist,300,100,200,300)
+        If ListSelectionChanged(saveloadlist) Then savename$ = "10000"+GetListSelection(saveloadlist)
+        Color 150,150,255
+        savename$ = Inputfield(savename$,300,410,150,20)
+        If _save = 1 Then bSaveLoad = button("Save",460,410,40,20) Else bSaveLoad = button("Load",460,410,40,20)
+        bCancelSaveLoad = button("Cancel",w-180,h-30,160,25)
+        
+        If ( bSaveLoad Or KeyHit(cbKeyReturn) ) And GetInputfieldText(savename$) <> "" Then
+            If _save = 1 Then
+                filename$=GetInputfieldText(savename$)
+                If InStr(filename$,".")>0 Then filename$ = GetWord(filename$,1,".")
+                SaveGame(savedir+"/"+filename$+".sav")
+                Return 1
+            Else
+                filename$=GetInputfieldText(savename$)
+                If InStr(filename$,".")>0 Then filename$ = GetWord(filename$,1,".")
+                If FileExists(savedir+"/"+filename$+".sav") Then
+                    LoadGame(savedir+"/"+filename$+".sav")
+                    Return 1
+                EndIf
+            EndIf
+        EndIf
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ) Then End
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Until bCancelSaveLoad Or KeyHit(1)
+    ClearKeys()
+    Return 0
+End Function
+
+
+
+Function DrawBGStars()
+    For i = 1 To maxbgstars
+        Color bgstars(i,0),bgstars(i,0),bgstars(i,0)
+        Dot bgstars(i,1), bgstars(i,2)
+        bgstars(i,1) = bgstars(i,1) - 5*bgsmx
+        bgstars(i,2) = bgstars(i,2) - 5*bgsmy
+        If bgstars(i,1) > w Then bgstars(i,1) = bgstars(i,1) - w: bgstars(i,2) = Rand(1,h)
+        If bgstars(i,1) < 0 Then bgstars(i,1) = bgstars(i,1) + w: bgstars(i,2) = Rand(1,h)
+        If bgstars(i,2) > h Then bgstars(i,2) = bgstars(i,2) - h: bgstars(i,1) = Rand(1,w)
+        If bgstars(i,2) < 0 Then bgstars(i,2) = bgstars(i,2) + h: bgstars(i,1) = Rand(1,w)
+    Next i
+End Function
+
+
+
+Function Menu(mainmenu=0)
+    Repeat
+        DrawImage galaxy, 0, 0
+        SetFont titlefont
+        Color 0,128,0
+        Text 20,10,"Reaching for Stars!"
+        If mainmenu = 1 Then
+            Color 100,100,100
+            SetFont titlefont
+            Text 40,60,"Main menu"
+        Else
+            SetFont normalfont
+            bSaveGame = button("Save Game",w-180,280,160,25)
+            bResume = button("Resume",w-180,h-30,160,25)
+        EndIf
+        SetFont smallfont: Color cbred: Text w-TextWidth(version)-5, 5, version
+        SetFont normalfont
+        bNewGame  = button("New Game",w-180,200,160,25)
+        bLoadGame = button("Load Game",w-180,240,160,25)
+        bQuit     = button("Quit",20,h-30,160,25)
+
+        If bSaveGame Then temp = SaveLoadScreen(1)
+        If bLoadGame Then bResume = SaveLoadScreen(0)
+        If bNewGame  Then
+            If mainmenu=0 Then
+                If MsgBox("This will abort the game in progress. Continue?","OK","Cancel") Then bResume = NewGame(): mainmenu = Not bResume
+            Else
+                 bResume = NewGame()
+            EndIf
+        EndIf
+        If bQuit Or (KeyDown(cbkeyLControl) And KeyHit(cbkeyQ)) Then End
+        If KeyDown(cbKeyG) And KeyDown(cbKeyU) And KeyDown(cbKeyN) Then Tappelu()
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Until bResume Or (KeyHit(1) And (Not mainmenu))
+End Function
+
+
+Function NewGame()
+    ResetGame()
+    numPlayers = 4
+    amoRaces$ = "00000"+Str(numPlayers)
+    amoStars$ = "0000025"
+    amoStarsPer$ = "000001"
+    amoSize$ = "0000032"
+    For i = 1 To maxplayers
+        racename(i) = "00000"+RandRaceName()
+        racecolor(i) = Rand(1,16581374)
+        racepic(i,0) = Rand(1,numRacePics)
+        aiflag(i) = 1
+    Next i
+    aiflag(1) = False
+    Repeat
+        key = GetKey()
+        numPlayers = Min( Max(Int(GetInputfieldText(amoRaces)),2) ,maxplayers)
+        DrawImage newbg, 0, 0
+        SetFont titlefont
+        Color 0,128,0
+        Text 20,10,"Reaching for Stars!"
+        Color 112,112,112
+        SetFont h1font
+        Text 40,60,"New Game"
+        SetFont normalfont
+        Color 0,0,200'128
+        Text 50,100,"Number of Races:"
+        Text 50,130,"Stars per Race:"
+        Text 300,100,"Number of Stars:"
+        Text 300,130,"Galaxy Diameter:                 ly"
+        Color 128,128,196
+        amoRaces    = Inputfield(amoRaces,180,100,40,20,key)
+        amoStarsper = Inputfield(amoStarsper,180,130,40,20,key)
+        amoStars    = Inputfield(amoStars,430,100,40,20,key)
+        amoSize     = Inputfield(amoSize ,430,130,40,20,key)
+
+        If Left(amoRaces,1)    = "0" Then amoRaces    = "00000"+Min( Max(Int(GetInputfieldText(amoRaces)),2) ,maxplayers)
+        If Left(amoStarsper,1) = "0" Then amoStarsper = "00000"+Min( Max(Int(GetInputfieldText(amoStarsper)),1) ,RoundDown(maxmaxsols/numPlayers))
+        If Left(amoStars,1)    = "0" Then amoStars    = "00000"+Min( Max(Int(GetInputfieldText(amoStars)),numPlayers) ,maxmaxsols)
+        If Left(amoSize,1)     = "0" Then amoSize     = "00000"+Min( Max(Int(GetInputfieldText(amoSize))*lyfactor,300) ,1500)/lyfactor
+
+        For j = 1 To Min( Max(Int(GetInputfieldText(amoRaces)),2) ,maxplayers)
+            Color 128,128,196
+            racename(j) = Inputfield(racename(j),50,200+30(j-1),120,20,key)
+            bRandName = button("?",180,200+30(j-1),20,20)
+            If bRandName Then racename(j) = "10000"+RandRaceName()
+            If j<>1 Then aiflag(j) = CheckBox("AI?",215,205+30(j-1),aiflag(j))
+            Color 0,0,-racecolor(j)
+            Box 260, 200+30(j-1), 20, 20
+            DrawImage smallracepics(racepic(j,0)), 300, 198+30(j-1)
+            If paletteopen = 0 And MouseX()=>260 And MouseX()<=280 And MouseY()>200+30(j-1) And MouseY()<220+30(j-1) Then
+                Color 10,10,50
+                Box 259, 199+30(j-1), 22, 22, OFF
+                Box 258, 198+30(j-1), 24, 24, OFF
+                If MouseDown(1) Then paletteopen=j: palettex=MouseX(): palettey=MouseY()
+                If MouseHit(2) Then racecolor(j) = Rand(1,16581374)
+            EndIf
+            If paletteopen = 0 And MouseX()=>300 And MouseX()<=320 And MouseY()=>198+30(j-1) And MouseY()<=222+30(j-1) Then
+                Color 10,10,50
+                Box 299, 197+30(j-1), 26, 26, OFF
+                Box 298, 196+30(j-1), 28, 28, OFF
+                If MouseDown(1) Then paletteopen=-j: palettex=MouseX(): palettey=MouseY()            
+                If MouseHit(2) Then racepic(j,0) = Rand(1,numRacePics)
+            EndIf
+        Next j
+        If paletteopen > 0 Then DrawImage palette, palettex, palettey
+        If paletteopen < 0 Then DrawImage img_allraces, palettex, palettey
+        If MouseUp(1) Then
+            If paletteopen > 0 Then
+                If MouseX()>palettex And MouseX()<palettex+ImageWidth(palette) And MouseY()>palettey And MouseY()<palettey+ImageHeight(palette) Then racecolor(paletteopen) = -GetPixel(MouseX(),MouseY(),SCREEN())',Image(palette))
+            ElseIf paletteopen < 0 Then
+                If MouseX()>palettex And MouseX()<palettex+ImageWidth(img_allraces) And MouseY()>palettey And MouseY()<palettey+ImageHeight(img_allraces) Then
+                    x = RoundDown((MouseX()-palettex) / (ImageWidth(racepics(0))/2)) +1
+                    y = RoundDown((MouseY()-palettey) / (ImageHeight(racepics(0))/2))
+                    k = x + y*(RoundUp(Sqrt(numRacePics)))
+                    If k <= numRacePics Then racepic(-paletteopen,0) = k
+                EndIf
+            EndIf
+            paletteopen = 0
+        EndIf
+        
+        bNewGame   = button("Start",620,535,160,25)
+        bCancelNew = button("Cancel",620,570,160,25)
+
+        If KeyDown(cbkeyLControl) And KeyHit(cbkeyQ)   Then End
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        If bNewGame Then
+            LoadTechs(techfile)
+            numPlayers=0
+            For j = 1 To Min( Max(Int(GetInputfieldText(amoRaces)),2) ,maxplayers)
+                NewRace(GetInputfieldText(racename(j)),racecolor(j),aiflag(j),racepic(j,0))
+            Next j
+            galaxydiameter = Min( Max(Float(GetInputfieldText(amoSize))*lyfactor,300) ,1500)'Min( Max(Int(GetInputfieldText(amoSize)),300) ,1500)
+            amoStarsPer = Min( Max(Int(GetInputfieldText(amoStarsper)),1) ,RoundDown(maxmaxsols/numPlayers))
+            amoStars = Max( Int(amoStarsPer)*Int(GetInputfieldText(amoRaces)), Int(GetInputfieldText(amoStars)) )
+            CreateStars(Min( Max(Int(amoStars),numPlayers) ,maxmaxsols), KeyDown(cbkeyF))
+            For i = 1 To Min( Max(Int(GetInputfieldText(amoRaces)),2) ,maxplayers)
+                For j = (i-1)*Int(amoStarsPer)+1 To (i-1)*Int(amoStarsPer)+Int(amoStarsPer)
+                    solowner(j) = i
+                    pop(j) = Min(Rand(20,25),maxpop(j)-1)
+                    ships(j) = 1
+                Next j
+            Next i
+            curneb = Rand(1,5)
+            UpdateKnownRaces()
+            curplayer=1: sel=1
+            If gLoadingCompleted = 0 Then Load()
+            UpdateTotProd(curplayer)
+            UpdateRR(curplayer)
+            UpdateGeneralLists(curplayer)
+            UpdateKnownSpace(curplayer)
+            If password(curplayer) = "" And CountHumans() > 1 Then PromtForPassword(curplayer)
+            Return True
+        EndIf
+        DrawScreen
+    Until bCancelNew Or KeyHit(1)
+    Return False
+End Function
+
+
+Function Console()
+    inp$ = InputBox("Enter console command:")
+    cmd$ = GetWord(inp,1)
+    If CountWords(inp$) = 3   Then
+        If cmd$ = "maxdist"   Then maxdist(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+        If cmd$ = "speed"     Then speed(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+        If cmd$ = "rr"        Then rr(Int(GetWord(inp,2))) = Int(GetWord(inp,3))
+        If cmd$ = "maxpop"    Then basemaxpop(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+        If cmd$ = "ecobonus"  Then maxpopbonus(Int(GetWord(inp,2))) = Float(GetWord(inp,3))     
+        If cmd$ = "popgrowth" Then popgrowth(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+        If cmd$ = "pop"       Then pop(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+        If cmd$ = "ships"     Then ships(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+        If cmd$ = "cannons"   Then canns(Int(GetWord(inp,2))) = Float(GetWord(inp,3))
+    ElseIf CountWords(inp$) = 2 Then
+        If cmd$ = "curpl"     Then curplayer = Int(GetWord(inp,2))
+        If cmd$ = "nebula"    Then curneb = Int(GetWord(inp,2))
+        If cmd$ = "costs"     Then costs = Int(GetWord(inp,2))
+        If cmd$ = "maxdist"   Then maxdist(curplayer) = Float(GetWord(inp,2))
+        If cmd$ = "speed"     Then speed(curplayer) = Float(GetWord(inp,2))
+        If cmd$ = "rr"        Then rr(curplayer) = Int(GetWord(inp,2))
+        If cmd$ = "maxpop"    Then basemaxpop(sel) = Float(GetWord(inp,2))
+        If cmd$ = "ecobonus"  Then maxpopbonus(sel) = Float(GetWord(inp,2))
+        If cmd$ = "popgrowth" Then popgrowth(sel) = Float(GetWord(inp,2))
+        If cmd$ = "pop"       Then pop(sel) = Float(GetWord(inp,2))
+        If cmd$ = "ships"     Then ships(sel) = Float(GetWord(inp,2))
+        If cmd$ = "cannons"   Then canns(sel) = Float(GetWord(inp,2))
+        If cmd$ = "aistats"   Then id=Int(GetWord(inp,2)):temp = MsgBox(racename(id)+"'s personality: act "+ai_act(id)+"; mil "+ai_mil(id)+"; loy "+ai_loy(id))
+        If cmd$ = "decrypt"   Then Decrypt GetWord(inp,2), GetWord(inp,2), cryptword
+    EndIf
+    If cmd$ = "savedir"   Then savedir = Trim(Mid(inp$,9))
+    If cmd$ = "msgfile"   Then messagefile = Trim(Mid(inp$,9))
+    If cmd$ = "techfile"  Then techfile = Trim(Mid(inp$,10))
+    If inp$ = "crypt 0"   Then crypt = 0
+    If inp$ = "crypt 1"   Then crypt = 1
+    If inp$ = "log 0"     Then gUseLog = 0
+    If inp$ = "log 1"     Then gUseLog = 1
+    If inp$ = "fog 0"     Then SetSpaceVisible()
+    If inp$ = "fog 1"     Then UpdateKnownSpace(curplayer)
+    If inp$ = "screens 0" Then gScreensType = 0
+    If inp$ = "screens 1" Then gScreensType = 1
+    If inp$ = "techs"     Then temp = MsgBox("Number of Technologies is "+numTechs)
+    If inp$ = "about"     Then temp = MsgBox("Reaching for Stars! - Author Tapio Vierros; Version "+version)
+    If inp$ = "hello"     Then temp = MsgBox("Greetings To You, Dear Gamer!")
+    If inp$ = "solstats"  Then
+        AddLog("---SolStats---")
+        For r = 1 To numPlayers
+            AddLog(racename(r)+"'s Systems")
+            For i = 1 To maxsols
+                If solowner(i) = r Then AddLog("Pop: "+pop(i)+"   Ships: "+ships(i)+"   Canns: "+canns(i))
+            Next i
+        Next r
+    EndIf
+End Function
+

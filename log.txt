@@ -1,0 +1,2 @@
+EventReport: New contact: You have made contact with the race Yyquuro (link: 2)  player: 1
+EventReport: New contact: You have made contact with the race Uxzai (link: 1)  player: 2

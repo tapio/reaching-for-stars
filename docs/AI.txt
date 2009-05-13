@@ -1,0 +1,43 @@
+Reaching for Stars AI specs
+---------------------------
+
+Perustuu kolmeen muuttujaan, joiden arvot ovat v‰lill‰ ]0,1[
+ * Aktiivisuus - 1 on eritt‰in aktiivinen, pyrkii valtaamaan nopeasti planeettoja, rakentaa aluksia jota l‰hett‰‰ nopeasti
+ * Sotaisuus - 1 on verenhimoinen, keskittyy sotatekniikkaan
+ * Lojaalius - 0 on petollinen, huijaa, sabotoi ja vakoilee, ei pid‰ diilej‰
+
+Tekniikka: [DONE]
+if 0 projektia menossa
+	if rnd < sotaisuus
+		valitse randomilla joku military tekniikka
+	else
+		valitse joku muu kun military tekniikka
+
+
+Planeetta: [DONE]
+Aseta tutkimus s‰‰din (1-aktiivisuus)
+Aseta ekologia +-0 ja lis‰‰ 10%(1-aktiivisuus)
+Aseta alukset (1/3)(2*aktiivisuus+sotaisuus)
+Aseta puolustus (1/5)(4*(1-aktiivisuus)+sotaisuus)
+Kaikkiin 5% satunnaisfiltteri
+Normalisoi, pit‰en ekologia kiinte‰n‰
+
+
+
+Retkikunnat: [DONE]
+if kantaman sis‰ll‰ planteettoja
+	if aluksia
+		if asumaton and rnd < aktiivisuus
+			l‰het‰ retkikunta
+		elseif asuttu and rnd < sotaisuus
+			l‰het‰ valloitusosasto
+	else
+		if rnd < aktiivisuus
+			lis‰‰ aluksien rakennusta ~33%
+else
+	if rnd < aktiivisuus
+		laita propulsiota tutkimukseen
+
+
+
+Diplomatia:

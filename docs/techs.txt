@@ -1,0 +1,72 @@
+Reaching for Stars TECHNOLOGIES
+-------------------------------
+
+
+Fields of Research
+
+Planetology
+Construction
+Propulsion
+Military
+
+
+
+Techs are divided in two main categories: Ships & Planets
+With each, there is a list of possible variables and then
+some suggestions for the names of the technologies.
+Roman numerals indicate that the tech has multiple levels.
+
+
+SHIPS
+
+[variables]
+weapon power
+weapon range
+weapon rate of fire
+weapon accuracy
+shields
+(hull armor?)
+speed
+(distance?)
+
+
+[techs]
+
+HD-laser
+pulse laser
+proton torpedos
+antimatter beam
+targeting computers I&II
+
+rocket thrusters
+ion engines
+nuclear pulse thruster
+solar sail
+antimatter engines
+gravitation field modifier
+wormhole generator
+
+
+
+PLANETS
+
+[variables]
+population growth
+max population
+production
+colonist weapons
+colonist armor
+cannon power
+cannon range
+cannon rate of fire
+cannon accuracy 
+
+[techs]
+
+terraforming I,II,III,IV,...
+skyscrapers I&II
+underground building I&II&III
+underwater building I&II&III
+environment&entertainment I,II,III,IV,...
+energy sources...
+industrial robots I&II

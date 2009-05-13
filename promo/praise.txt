@@ -1,0 +1,65 @@
+[IMG]http://img171.imageshack.us/img171/7823/bannerqx9.png[/IMG]
+Reaching for Stars! - Avaruusimperiumipeli
+
+Kyseessä on jo vanha projekti, jonka otin tossa kuukausi sitten uudestaan työstöön. Edistymistä voi seurata takautuvasti projektiblogistani, mutta asiaan:
+
+Eli pähkinänkuoressa tämä on 4X-genren vuoropohjainen galaksin valloituspeli (vähän kuin esim. Master of Orion). Pelissä on jo paljon ominaisuuksia valmiina:
+ * yksinkertainen, neljään liukusäätimeen perustuva tähtijärjestelmien managerointi
+ * pelialueena kolmiulotteinen, noin 5-100 tähden pyöriteltävä tähtijoukko (käytännössä 20-30 lienee paras)
+ * aluksia ja populaatiota voi lähettää muihin tähtijärjestelmiin (myös hyökätä vihollisen kimppuun)
+ * tekniikkaa voi tutkia ja sillä on myös vaikutusta eri asioihin
+ * save/load toimii
+ * diplomatiassa voi käydä kauppaa tuntemiensa rotujen kanssa esimerkiksi tekniikasta, liittolaisuuksista ja aurinkokunnista
+ * moninpeli (hot-seat ja periaatteessa PBEM); salasanalla suojatut pelaajat
+ * yksinkertainen tekoäly, joka osaa tutkia tekniikkaa, hallita aurinkokuntien taloutta, harrastaa sabotaasia  ja lähettää retkikuntia persoonallisuutensa mukaisesti sekä päätellä alkeellisesti kannattaako vaihtokauppoihin suostua
+ * (yli 4200 riviä pitkä koodi ja 125 funktiota)
+
+Vielä puuttuu:
+ * tekoälyn aktiivinen diplomatia ja älykkäät hyökkäykset (muutenkin hiontaa ai:n saralla voisi harrastaa)
+ * laivasto vastaan laivasto taistelut avaruudessa eivät ole tuettuna
+ * pelin voi voittaa toistaiseksi vain tuhoamalla muut
+ * puuttuu kaikenlainen äänimaailma (tastamusiikki etunenässä)
+ * yleistä hiomista kaikkialla
+ * testaus ja tasapainotus
+
+Näitä ei nähdä:
+ * taktinen taistelu (taistelut on numeroita)
+ * kustomoitavia aluksia (tässä on vain yksi alustyyppi, jota tekniikat parantaa) (ehkä jos innostus riittää niin kakkosversiossa...)
+ * automaattista, suoraa nettimoninpeliä (manuaalinen PBEM riittäköön)
+
+
+Nyt kun peli on ehkä 95% valmis on aika ruveta todenteolla hiomaan ja niinpä ulkoistan testauksen teille. Ladatkaa paketti, lukekaa käyttöehdot.txt, betatestaajille.txt sekä Readme.txt ja kokeilkaa peliä.
+
+Jotta ei tarvitse sikaa säkissä ottaa, pari kuvaa:
+[URL=http://img167.imageshack.us/my.php?image=galaxyviewcc5.png][IMG]http://img167.imageshack.us/img167/8649/galaxyviewcc5.th.png[/IMG][/URL]
+[URL=http://img165.imageshack.us/my.php?image=techscreenmc1.png][IMG]http://img165.imageshack.us/img165/8559/techscreenmc1.th.png[/IMG][/URL]
+
+[b][url=http://koti.mbnet.fi/rfs/download.php]Lataa paketti[/url][/b]
+
+[i]PS. CB:ssä näyttäisi olevan rajoitus max. 127 funktiota. Kesti noin tunti selvittää mikä oli vikana kun kääntäjä vaan herjasi Fatal Error ja käynnisti vanhan cbRunin. :( [/i]
+
+
+
+
+
+
+
+
+
+
+Teknologioita varten olen tehnyt ihanan systeemin, joka lataa ne tiedostosta ja näin ollen niitä on naurettavan helppo lisätä sitä mukaan, kun keksii. Malli:
+[CODE]name= Gravitational Field Modifier
+desc= This device allows ships to travel extremely quickly.
+category= Propulsion
+cost= 2500
+effect= speed 30
+effect2= distance 600
+preq= Antimatter Engines
+preq2= Particle Accelerator
+preq3= Quantium Computer[/CODE]
+
+Saman suuntaista systeemiä käytän viestien ja pelitilanteen tallennuksessa. Kun homma toteutetaan tuollai (eli on noita "muuttuja nimiä") välistä voi jättää pois valinnaisuuksia, tiedoston keskellä voi olla tyhjiä rivejä tai asiat voivat olla (tietyin rajoituksin) vaihtelevassa järjestyksessä. Uuden featuren lisääminen ei myöskään tee vanhoista tallennuksista käyttökelvottomia (puuttuvalle muuttujalle vain annetaan oletusarvo). Eli joustavuutta piisaa. Tietosuoja varmistetaan kryptaamalla selkokielinen tiedosto.
+
+
+Triviaa:
+Koodi on yli 4200 riviä, funktioita 125 ja mediaa (kuvia ym.) vajaa 2Mt. Teknologioita oli 46 kun viimeksi laskin.

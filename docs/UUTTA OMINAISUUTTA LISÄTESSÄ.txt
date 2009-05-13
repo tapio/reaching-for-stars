@@ -1,0 +1,3 @@
+1. Tee tarvittavat taulukko varaukset ja globaalit muuttujat
+2. Lisää saveen ja loadiin
+3. Lisää sinne, minne se kuuluu eli tapahtuma/toteutus

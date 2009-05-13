@@ -1,0 +1,13 @@
+Kriittiset bugit:
+
+EI YHTÄÄN !!!
+
+
+
+Tulevat ominaisuudet:
+
+ * AI lähettää viestejä
+ * laivastot taistelee avaruudessa
+ * lopetuksia (teknologia? ystävyys?)
+ * musiikkia
+ * ääniä (clicks)

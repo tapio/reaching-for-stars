@@ -1,0 +1,1859 @@
+// PROJECT: Reaching for Stars
+// VERSION: beta 3
+// AUTHOR:  Tapio Vierros
+// FILE:    load.cb - loading & functions module
+// LICENSE: See LICENSE-file
+
+Global loadbg
+loadbg = LoadImage("data/Twins.jpg")
+DisplayLoadingStatus(loadbg, "Loading, please wait...")
+AddLog("")
+AddLog("----New Game @ "+Time()+" "+Date()+"----")
+AddLog("")
+
+Global gScaledImage
+gScaledImage = MakeImage(1, 1)
+
+Global question As String
+Global gLoadingCompleted, gUseLog
+gUseLog = 1
+
+// QUATERNIONS
+Dim qStars#(3)
+    qStars(0) = 1
+Dim qTemp#(3)
+    qTemp(0) = 1
+    
+// MATRIX
+Dim mStars#(16)
+    mStars(1) = 1
+    mStars(6) = 1
+    mStars(11) = 1
+    mStars(16) = 1
+Global originX#, originY#, originZ#
+Global originTX#,originTY#,originTZ#
+
+Const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+Const lettersA = "AEIOUY"
+Const lettersB = "BCDFGHJKLMNPQRSTVWXZ"
+Const cryptword = "vnfuw9057w0eufsvnxcvnw09ttq9wudhasdmbp+w9t4ui3w4otigfapshdaqwp"
+Global crypt : crypt = 1
+
+Global smallfont, normalfont, h1font, h2font, titlefont
+
+smallfont = LoadFont("Times",14)
+normalfont = LoadFont("Verdana",14)
+h1font = LoadFont("Arial Black",26)
+h2font = LoadFont("Arial Black",22)
+titlefont = LoadFont("Times",48)
+
+Dim scalefont(64)
+For i = 1 To 64
+    scalefont(i) = LoadFont("Courier New", Int(i/3))
+Next i
+SetFont normalfont
+
+
+Const maxbgstars = 600		  'amount of background stars
+Dim bgstars(maxbgstars,2)
+Global bgsmx, bgsmy
+For i = 1 To maxbgstars
+    bgstars(i,0) = Rand(50,250)
+    bgstars(i,1) = Rand(1,w)
+    bgstars(i,2) = Rand(1,h)    
+Next i
+
+Const LENS = 256
+
+Const lyfactor = 25
+
+Global gScreensType: gScreensType = Int(ReadValue("Config.ini","screens","0"))
+    
+Global bMinimize1, bMinimize2, bShipsPlus, bShipsMinus, bselDest, bAcceptDest, bLand, bSpies, bSaboteurs, bSetCourse
+Global bFleets, bStars, bGeneralBack, bTechnology, bDiplomacy, bReport, bEndTurn
+
+Global techbg,diplbg,techbgFull,diplbgFull,reportbg,newbg,atmosphere,galaxy,saveloadbg,inputboxbg,palette
+Global tab1,tab1x,tab1y,tab1state
+Global tab2,tab2x,tab2y,tab2state
+Global activetab,dragtab,mouseover,generaltabmode,calcStars,dragpointx,dragpointy
+Global dest,selDest,numsendships,numsendcolons
+Global sel, rotatestyle
+Global dist2dest#
+newbg     = LoadImage("data/menubg.jpg")
+saveloadbg= LoadImage("data/AlienWorld.jpg")
+galaxy    = LoadImage("data/galaxy.jpg")
+palette   = LoadImage("data/palette.png")
+inputboxbg= LoadImage("data/inputboxbg.png"): MaskImage inputboxbg,0,0,0
+tab1      = LoadImage("data/tab1.png"): MaskImage tab1,0,0,0
+tab1x     = 600
+tab1y     = 0
+tab1state = 1
+tab2      = LoadImage("data/tab2.png"): MaskImage tab2,0,0,0
+tab2x     = 600
+tab2y     = 400
+tab2state = 1
+Dim tabstate(1) As String
+tabstate(0) = "+"
+tabstate(1) = "-"
+activetab = 2
+
+Global tab2buttons
+
+
+Const fleetlist = 1
+Const starlist = 2
+Const techlist = 3
+Const reportlist = 4
+Const givelist = 5
+Const requestlist = 6
+Const threatlist = 7
+Const saveloadlist = 8
+Const ListsNoMax = 10 'Korkeintaan N listaa
+Const ListItemsNoMax = 1000 'Korkeintaan N valintaa per lista
+Dim ListItems(ListsNoMax,ListItemsNoMax) As String
+Dim ListItemsNo(ListsNoMax)
+Dim ListSelection(ListsNoMax)
+Dim ListScroll(ListsNoMax)
+Dim ListActive(ListsNoMax) As Byte
+Dim ListSelectChanged(ListsNoMax) As Byte
+Dim checked_xpradio(100)
+Dim disabled_xpradio(100)
+
+
+Global cursor, oldmx, oldmy
+cursor = MakeImage(32,32)
+DrawToImage cursor
+    Color cbRed
+    Line 16,16,32,24
+    Line 16,16,24,32
+    Line 17,17,32,25
+    Line 17,17,25,32
+DrawToScreen
+MaskImage cursor,0,0,0
+
+Dim imgbigstar(6)
+Dim stardesc(6) As String
+stardesc(1) = "Red stars are relatively cold and dim."
+stardesc(2) = "Orange stars have a little lower temperature than average stars."
+stardesc(3) = "Yellow stars offer good conditions for life."
+stardesc(4) = "White stars are regularly large and hot."
+stardesc(5) = "Blue stars are extremely hot and large."
+stardesc(6) = "Purple stars are small but very dense and they radiate strongly on all frequencies."
+
+
+Color cbWhite
+///////////////////////Smooth2D ON
+
+Dim imgneb(5)
+Global curneb
+curneb = Rand(1,5)
+Dim imgstar(6,64+64)
+
+Const maxplayers = 8
+Global numPlayers
+Dim racename$(maxplayers)
+Dim racecolor(maxplayers) // (b + (g Shl 8) + (r Shl 16) + (255 Shl 24))
+Dim relations(maxplayers,maxplayers)
+Dim prodbonus#(maxplayers)
+Dim attbonus#(maxplayers)
+Dim defbonus#(maxplayers)
+Dim groundatt#(maxplayers)
+Dim grounddef#(maxplayers)
+Dim maxdist(maxplayers)
+Dim speed#(maxplayers)
+Dim popgrowth#(maxplayers)
+Dim maxpopbonus#(maxplayers)
+Dim RR(maxplayers)
+Dim totprod#(maxplayers)
+Dim aiflag(maxplayers)
+Dim ai_act#(maxplayers)
+Dim ai_mil#(maxplayers)
+Dim ai_loy#(maxplayers)
+Dim password$(maxplayers) As String
+Dim reports$(maxplayers,9999,2)
+Dim racepic(maxplayers,2)
+Dim racepics(999)
+Dim smallracepics(999)
+Dim racepicfiles(999) As String
+Global numRacePics, img_allraces
+Smooth2D ON
+LoadRacePics("data/races")
+
+img_allraces = MakeImage( RoundUp(Sqrt(numRacePics))*ImageWidth(racepics(0)),RoundUp(Sqrt(numRacePics))*ImageWidth(racepics(0)) )
+DrawToImage img_allraces
+    Color 255,255,255: Box 0,0,ImageWidth(img_allraces),ImageHeight(img_allraces)
+    k=0
+    For j = 0 To RoundUp(Sqrt(numRacePics))-1
+        For i = 0 To RoundUp(Sqrt(numRacePics))-1
+            k+1
+            If k <= numRacePics Then DrawImage racepics(k),i*ImageWidth(racepics(k))+ImageWidth(racepics(k))/2,j*ImageHeight(racepics(k))+ImageWidth(racepics(k))/2
+        Next i
+    Next j
+DrawToScreen
+'img_allraces = ScaleImage(img_allraces,ImageWidth(img_allraces)/2,ImageHeight(img_allraces)/2)
+ResizeImage img_allraces,ImageWidth(img_allraces)/2,ImageHeight(img_allraces)/2
+Smooth2D OFF
+
+racename(0) = "Unclamed"
+racecolor(0) = 4144960
+
+Global curplayer: curplayer = 1
+
+Dim diplmsg$(999,3,1)
+Global messagesfile$ : messagesfile = "data/messages.dat"
+Global savedir$ : savedir = "saves"
+If FileExists(messagesfile) Then DeleteFile messagesfile
+
+Dim differencestrings(6) As String
+differencestrings(0) = "equal"
+differencestrings(1) = "minimally higher"
+differencestrings(2) = "little higher"
+differencestrings(3) = "higher"
+differencestrings(4) = "much higher"
+differencestrings(5) = "very much higher"
+differencestrings(6) = "totally superior"
+
+Const maxfleets = 512
+Global fleets
+Dim fleet#(maxfleets, 10)
+Dim fleetname$(maxfleets)
+Dim fstats(maxfleets, 5)
+// 0 = index
+// 1 = owner
+// 2 = target
+// 3 = ships
+// 4 = colons
+// 5 = fuel
+
+Const maxmaxsols = 100
+Global maxsols, galaxydiameter
+galaxydiameter = 800
+Dim solname$(maxmaxsols)       'holds the name of each sol
+Dim solowner(maxmaxsols)       'holds the owner of each sol
+Dim sol#(maxmaxsols,10)       'holds information of the sols, arranged by index number
+Dim draworder#(maxmaxsols+maxfleets,10)  'holds copy of the information, but is arranged by distance to viewer
+Dim sorttemp#(10)           'used in sorting
+// 0 = index
+// 1 = x
+// 2 = y
+// 3 = z
+// 4 = ScreenX
+// 5 = ScreenY
+// 6 = cull
+// 7 = color/type
+// 8 = size
+// 9 = in fog?
+
+Dim basemaxpop#(maxmaxsols)
+Dim pop#(maxmaxsols)
+Dim ships#(maxmaxsols)
+Dim canns#(maxmaxsols)
+Dim spies(maxplayers,maxmaxsols)
+Dim slid_ships#(maxmaxsols)
+Dim slid_defe#(maxmaxsols)
+Dim slid_eco#(maxmaxsols)
+Dim slid_tech#(maxmaxsols)
+Dim ai_travelling(maxmaxsols)
+Global costs#
+
+// Nebula
+sol(0,1) = Rnd(-halfh,halfh)
+sol(0,2) = Rnd(-halfh,halfh)
+sol(0,3) = Rnd(-halfh,halfh)
+td# = Sqrt(sol(0,1)^2 + sol(0,2)^2 + sol(0,3)^2)
+sol(0,1) = sol(0,1) / td * 100000
+sol(0,2) = sol(0,2) / td * 100000
+sol(0,3) = sol(0,3) / td * 100000
+
+Const maxtechs = 999
+Const READY = 100000
+Const STARTED = 0.001
+Global numTechs
+Global techfile As String: techfile = "data/techs.dat"
+Dim techs(maxtechs,10) As String
+Dim researched(maxplayers,maxtechs) As Float
+'LoadTechs("data/techs.dat")
+
+'CreateStars(25)
+
+Wait 10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ----- FUNCTIONS ----- //
+
+Function Load()
+    ShowMouse OFF 
+    DisplayLoadingStatus(loadbg, "Loading, please wait... 0%")
+    techbg     = LoadImage("data/techbg.png"): MaskImage techbg,0,0,0
+    diplbg     = LoadImage("data/diplbg.png"): MaskImage diplbg,0,0,0
+    techbgFull = LoadImage("data/techbg.jpg")
+    diplbgFull = LoadImage("data/diplbg.jpg")
+    reportbg   = LoadImage("data/reportbg.jpg")
+    atmosphere = LoadImage("data/Atmosphere.jpg")
+    DisplayLoadingStatus(loadbg, "Loading, please wait... 10%")
+    
+    For typ = 1 To 6
+        imgbigstar(typ) = LoadImage("data/BigStar_"+ typ +".png")
+    Next typ
+    imgbigstar(0) = LoadImage("data/BigFleet.png")
+    DisplayLoadingStatus(loadbg, "Loading, please wait... 15%")
+    
+    For typ = 1 To 5
+        imgneb(typ) = LoadImage("data/neb_"+ typ +".jpg")
+        HotSpot imgneb(typ), ImageWidth(imgneb(typ))/2, ImageHeight(imgneb(typ))/2
+    Next typ
+    DisplayLoadingStatus(loadbg, "Loading, please wait... 20%")
+    
+    For typ = 1 To 6
+        imgstar(typ, 0) = LoadImage("data/Star_"+ typ +".png")
+        For i = 1 To 64
+            imgstar(typ,i) = CloneImage(imgstar(typ,0))
+            'imgstar(typ,i) = ScaleImage(imgstar(typ,i), i+3, i+3)
+            ResizeImage imgstar(typ,i), i+3, i+3
+            'imgstar(typ,i) = ImageBrightness(imgstar(typ,i),(-64+i)*2)
+            'imgstar(typ,i) = MaskApprox(imgstar(typ,i),0,0,0,40)
+            HotSpot imgstar(typ,i), ImageWidth(imgstar(typ,i))/2, ImageHeight(imgstar(typ,i))/2
+            MaskImage imgstar(typ,i), 0, 0, 0
+            // make a fogged copy
+            imgstar(typ,i+64) = CloneImage(imgstar(typ,i))
+            'imgstar(typ,i+64) = ImageBrightness(imgstar(typ,i+64),-100)
+            imgstar(typ,i+64) = ApplyNoise(imgstar(typ,i+64),40)
+            HotSpot imgstar(typ,i+64), ImageWidth(imgstar(typ,i+64))/2, ImageHeight(imgstar(typ,i+64))/2
+            MaskImage imgstar(typ,i+64), 0, 0, 0
+        Next i
+        DisplayLoadingStatus(loadbg, "Loading, please wait... " + Str(20+typ*10) + "%")
+    Next typ
+    
+    imgstar(0,0) = LoadImage("data/Fleet.bmp")
+    For i = 1 To 64
+        imgstar(0,i) = CloneImage(imgstar(0,0))
+        'imgstar(0,i) = ScaleImage(imgstar(0,i), Max(1,Int(i/4)), Max(1,Int(i/4)))
+        ResizeImage imgstar(0,i), Max(1,Int(i/4)), Max(1,Int(i/4))
+        MaskImage imgstar(0,i), 0,0,0
+        HotSpot imgstar(0,i), ImageWidth(imgstar(0,i))/2, ImageHeight(imgstar(0,i))/2
+        
+            // make a fogged copy
+        imgstar(0,i+64) = CloneImage(imgstar(0,i))
+        'imgstar(0,i+64) = ImageBrightness(imgstar(0,i+64),-100)        
+        HotSpot imgstar(0,i+64), ImageWidth(imgstar(0,i+64))/2, ImageHeight(imgstar(0,i+64))/2
+        MaskImage imgstar(0,i+64), 0, 0, 0
+    Next i
+    DisplayLoadingStatus(loadbg, "Loading, please wait... 90%")
+    
+    // Make general tab buttons image
+    tab2buttons = MakeImage(ImageWidth(tab2), ImageHeight(tab2))
+    DrawToImage tab2buttons
+        Color cbMagenta
+        Box 0,0,ImageWidth(tab2), ImageHeight(tab2), ON
+        Color 50,50,50
+        bTechnology = button("Technology",20,80,160,25)
+        Text 20+((160-TextWidth("Technology"))/2), -(80+((25-TextHeight("Technology"))/2)),"Technology"
+        bDiplomacy = button("Diplomacy",20,110,160,25)
+        Text 20+((160-TextWidth("Diplomacy"))/2), -(110+((25-TextHeight("Diplomacy"))/2)),"Diplomacy"
+        bFleets = button("Fleets",20,145,50,0)
+        Text 20+((50-TextWidth("Fleets"))/2), -(145+((TextHeight("Fleets")*1.3-TextHeight("Fleets"))/2)),"Fleets"
+        bStars = button("Stars",75,145,50,0)
+        Text 75+((50-TextWidth("Stars"))/2), -(145+((TextHeight("Stars")*1.3-TextHeight("Stars"))/2)),"Stars"
+        bMenu = button("Menu",130,145,50,0)
+        Text 130+((50-TextWidth("Report"))/2), -(145+((TextHeight("Report")*1.3-TextHeight("Report"))/2)),"Report"
+        bEndTurn = button("End Turn",20,170,160,25)
+        Text 20+((160-TextWidth("End Turn"))/2), -(170+((25-TextHeight("End Turn"))/2)),"End Turn"
+    DrawToScreen
+    MaskImage tab2buttons, cbMagenta
+    DisplayLoadingStatus(loadbg, "Loading, please wait... 100%")
+    gLoadingCompleted = True 
+    ShowMouse cursor
+End Function
+
+
+// - GRAPHICAL FUNCTIONS -
+
+
+Function DisplayLoadingStatus(_image, _text$)
+    DrawImage _image, 0,0
+    Color cbWhite
+    Text 10,10,_text$
+    DrawScreen
+End Function
+
+
+// Display sols
+Function DrawGalaxy(transform=1)
+    If transform = True Then TransformPoints(originX,originY,originZ)
+    For i = 1 To maxsols+fleets
+        If draworder(i,6) = False Then 
+            If draworder(i,7) > 0 Or draworder(i,9) = 0 Then DrawImage imgstar(Int(draworder(i,7)),Int(draworder(i,8)+64*draworder(i,9))), draworder(i,4), draworder(i,5)
+            If draworder(i,8) => 8 And draworder(i,9) = 0 Then 
+                SetFont scalefont(Int(draworder(i,8)))
+                If draworder(i,7)<>0 Then
+                    Color 0,0,-racecolor(solowner(Int(draworder(i,0))))
+                    CenterText draworder(i,4), draworder(i,5)+draworder(i,8)/2, solname(Int(draworder(i,0)))
+                Else
+                    Color 0,0,-racecolor(fstats(Int(-draworder(i,0)),1))
+                    CenterText draworder(i,4), draworder(i,5)+draworder(i,8)/4, fleetname(Int(-draworder(i,0)))
+                EndIf
+            EndIf
+        EndIf
+    Next i
+End Function
+
+
+Function UpdateKnownSpace(pl)
+    For i = 1 To maxsols
+        If solowner(i) = pl Then sol(i,9) = False Else sol(i,9) = True
+    Next i
+    For k = 1 To fleets
+        If fstats(k,1) = pl Then fleet(k,9) = False Else fleet(k,9) = True
+    Next k
+    // What stars see
+    For i = 1 To maxsols
+        If solowner(i) = pl Then
+            For j = 1 To maxsols
+                If solowner(j) <> pl Then
+                    If Distance3d(sol(i,1),sol(i,2),sol(i,3),sol(j,1),sol(j,2),sol(j,3)) <= maxdist(pl) Then Sol(j,9) = False
+                EndIf
+            Next j
+            For k = 1 To fleets
+                If fstats(k,1) <> pl Then
+                    If Distance3d(sol(i,1),sol(i,2),sol(i,3),fleet(k,1),fleet(k,2),fleet(k,3)) <= maxdist(pl) Then fleet(k,9) = False
+                EndIf
+            Next k
+        EndIf
+    Next i
+    // What fleets see
+    For i = 1 To fleets
+        If fstats(i,1) = pl Then
+            For j = 1 To maxsols
+                If solowner(j) <> pl Then
+                    If Distance3d(fleet(i,1),fleet(i,2),fleet(i,3),sol(j,1),sol(j,2),sol(j,3)) <= maxdist(pl) Then Sol(j,9) = False
+                EndIf
+            Next j
+            For k = 1 To fleets
+                If fstats(k,1) <> pl Then
+                    If Distance3d(fleet(i,1),fleet(i,2),fleet(i,3),fleet(k,1),fleet(k,2),fleet(k,3)) <= maxdist(pl) Then fleet(k,9) = False
+                EndIf
+            Next k
+        EndIf
+    Next i
+End Function
+
+
+Function SetSpaceVisible(_no=0)
+    For i = 1 To maxsols
+        sol(i,9) = _no
+    Next i
+    For k = 1 To fleets
+        fleet(k,9) = _no
+    Next k
+End Function
+
+
+
+// FILE FUNCTIONS
+
+Function AddLog(st$,logfile$="log.txt")
+    If gUseLog Then
+        iFile = OpenToEdit(logfile)
+            SeekFile  iFile,FileSize(logfile)
+            WriteLine iFile,st$
+        CloseFile iFile
+    EndIf
+End Function
+
+
+Function ReadValue$(file$, keyword$, _def$="ERROR")
+    If Not FileExists(file$) Then Return _def$
+    f = OpenToRead(file$)
+    keyword$ = Lower(keyword$)
+	While Not EOF(f)
+		row$ = ReadLine(f)
+        If Lower(Trim(GetWord(row$, 1, "="))) = keyword$ Then CloseFile f: Return Trim(GetWord(row$, 2, "="))
+	Wend
+	Return _def$
+End Function
+
+
+Function LoadTechs(file$)
+    ResetTechs()
+    f = OpenToRead(file$)
+    i=0
+    While Not EOF(f)
+        row$ = Trim(ReadLine(f))
+        key$ = GetWord(row,1,"=")
+        If key = "name" Then
+            i+1
+            techs(i,1) = Trim(GetWord(row$,2,"="))
+            techs(i,8) = "none"
+            techs(i,9) = "none"
+            techs(i,10) = "none"
+        ElseIf key = "category" Then
+            techs(i,2) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "desc" Then
+            techs(i,3) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "cost" Then
+            techs(i,4) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "effect" Then
+            techs(i,5) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "effect1" Then
+            techs(i,5) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "effect2" Then
+            techs(i,6) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "effect3" Then
+            techs(i,7) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "preq" Then
+            techs(i,8) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "preq1" Then
+            techs(i,8) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "preq2" Then
+            techs(i,9) = Trim(GetWord(row$,2,"="))
+        ElseIf key = "preq3" Then
+            techs(i,10) = Trim(GetWord(row$,2,"="))
+        EndIf
+    Wend
+    numTechs = i
+    CloseFile f
+End Function
+
+
+Function LoadRacePics(_dir$)
+    racepics(0) = LoadImage("data/questionmark.png")
+    smallracepics(0) = CloneImage(racepics(0))
+    ResizeImage smallracepics(0), 24, 24
+    racepicfiles(0) = "questionmark.png"
+    MaskImage racepics(0),255,255,255
+    HotSpot racepics(0),ImageWidth(racepics(0))/2,ImageHeight(racepics(0))/2
+    curdir$ = CurrentDir()
+    ChDir _dir$
+    StartSearch
+        numRacePics=0
+        Repeat
+            file$=FindFile()
+            If file$="" Then Exit
+            If Lower(Right(file$,4))=".png" Or Lower(Right(file$,4))=".bmp" Then
+                numRacePics = numRacePics + 1
+                racepics(numRacePics) = LoadImage(file$)
+                'racepics(numRacePics) = ImageColorize(racepics(numRacePics), Rand(-128,128), Rand(-128,128), Rand(-128,128))
+                smallracepics(numRacePics) = CloneImage(racepics(numRacePics))
+                ResizeImage smallracepics(numRacePics), 24, 24
+                racepicfiles(numRacePics) = file$
+                HotSpot racepics(numRacePics), ImageWidth(racepics(numRacePics))/2, ImageHeight(racepics(numRacePics))/2
+                MaskImage racepics(numRacePics),255,255,255
+            EndIf
+        Forever
+    EndSearch
+    ChDir curdir$
+End Function
+
+
+
+// TECH FUNCTIONS
+
+
+Function ResetTechs()
+    For t = 1 To numTechs
+        For i = 0 To 10
+            techs(t,i) = ""
+        Next i
+    Next t
+    numTechs=0
+End Function
+
+Function PutTechsToList(lid,pl=1)
+    FormatList(lid)
+    For i = 1 To numTechs
+        progress$ = ""
+        If researched(pl,i) < READY-1 And ( techs(i,8) = "none" Or researched(pl,getTechIdFromString(techs(i,8)))=>READY-1 ) And ( techs(i,9) = "none" Or researched(pl,getTechIdFromString(techs(i,9)))=>READY-1 ) And ( techs(i,10) = "none" Or researched(pl,getTechIdFromString(techs(i,10)))=>READY-1 ) Then
+            tempf# = Abs(researched(pl,i)) / Float(techs(i,4)) * 100
+            If Abs(researched(pl,i))>STARTED/2 Then progress = " - Estimated Progress: " + Str(RoundDown(tempf)) + "%"
+            If researched(pl,i) < -STARTED/2 Then AddListItem(lid,techs(i,2)+" - "+techs(i,1)+progress+" - <On Hold>") Else AddListItem(lid,techs(i,2)+" - "+techs(i,1)+progress)
+        EndIf
+    Next i
+    SortList(lid)
+End Function
+
+
+Function GetTechIdFromString(st$)
+    If InStr(st$,"-") > 0 Then
+        st$ = Mid(st$,InStr(st$,"-")+2)
+        If InStr(st$,"-") > 0 Then st$ = Mid(st$,1,InStr(st$,"-")-2)
+    EndIf
+    For i = 1 To numTechs
+        If techs(i,1) = st$ Then Return i
+    Next i
+    Return 0
+End Function
+
+
+Function GetRandTech(_type=-1,pl=0)
+    PutTechsToList(techlist,pl)
+    If ListItemsNo(techlist) = 0 Then Return 0
+    For i = 1 To 1000
+        SelectListItem(techlist,Rand(1,ListItemsNo(techlist)))
+        If _type = 1 Then
+            If GetWord(GetListSelection(techlist),1,":") = "Military" Then Return GetTechIdFromString(GetListSelection(techlist)) 
+        ElseIf _type = 2 Then
+            If GetWord(GetListSelection(techlist),1,":") <> "Military" Then Return GetTechIdFromString(GetListSelection(techlist)) 
+        ElseIf _type = 3 Then
+            If GetWord(GetListSelection(techlist),1,":") <> "Propulsion" Then Return GetTechIdFromString(GetListSelection(techlist)) 
+        ElseIf _type = 0 Then
+            Return GetTechIdFromString(GetListSelection(techlist)) 
+        EndIf
+    Next i
+    Return 0
+End Function
+
+
+Function CountResearchInProgress(pl=1)
+    k=0
+    For t = 1 To numTechs
+        If researched(pl,t) > STARTED/2 And researched(pl,t) < READY-1 Then k+1
+    Next t
+    Return k
+End Function
+
+
+Function ParseTechEffect(tid,pl=1)
+    For e = 5 To 7
+        var$ = GetWord(techs(tid,e),1)
+        param# = Float(GetWord(techs(tid,e),2))
+        If var$ = "prod" Then
+            prodbonus(i) = prodbonus(i) + param
+        ElseIf var$ = "distance" Then
+            maxdist(pl) = Max(maxdist(pl), param)
+        ElseIf var$ = "speed" Then
+            speed(pl) = Max(speed(pl), param)
+        ElseIf var$ = "maxpop" Then
+            maxpopbonus(pl) = maxpopbonus(pl) + param
+        ElseIf var$ = "popgrowth" Then
+            popgrowth(pl) = popgrowth(pl) + param
+        ElseIf var$ = "attackmodifier" Then
+            attbonus(pl) = attbonus(pl) + param
+        ElseIf var$ = "defencemodifier" Then
+            defbonus(pl) = defbonus(pl) + param
+        ElseIf var$ = "groundattackmodifier" Then
+            groundatt(pl) = groundatt(pl) + param
+        ElseIf var$ = "grounddefencemodifier" Then
+            grounddef(pl) = grounddef(pl) + param
+        EndIf
+    Next e
+End Function
+
+
+
+
+Function ParseSabotageEffect(_typ,_sol,slid_sabo,_human=1)
+    costs = costs + slid_sabo
+    If _typ = 1 Then
+        reduce#      = slid_sabo/6 * Rnd(.5,1.5)
+        reduce2#     = slid_sabo/4 * Rnd(.5,1.5)
+        reduce       = Min(reduce,ships(sel))
+        ships(_sol)  = ships(_sol) - reduce
+        reduce2      = Min(reduce2,canns(_sol))
+        canns(_sol)  = canns(_sol) - reduce2
+        If _human Then temp = MsgBox("Saboteurs destroyed "+Int(reduce)+" ships and "+Int(reduce2+" cannons."))
+        AddReport("Sabotage!","Your "+solname(_sol)+" system has been attacked by saboteurs! "+Int(reduce)+" ships and "+Int(reduce2)+" cannons were destroyed.",solowner(_sol),Str(_sol))
+    ElseIf _typ = 2 Then
+        reduce#      = slid_sabo/3 * Rnd(.5,1.5)
+        reduce       = Min(reduce,ships(_sol))
+        ships(_sol)  = ships(_sol) - reduce
+        If _human Then temp = MsgBox("Saboteurs destroyed "+Int(reduce)+" ships.")
+        AddReport("Sabotage!","Your "+solname(_sol)+" system has been attacked by saboteurs! "+Int(reduce)+" ships were destroyed.",solowner(_sol),Str(_sol))
+    ElseIf _typ = 3 Then
+        reduce#      = slid_sabo/2 * Rnd(.5,1.5)
+        reduce       = Min(reduce,canns(_sol))
+        canns(_sol)  = canns(_sol) - reduce
+        If _human Then temp = MsgBox("Saboteurs destroyed "+Int(reduce)+" cannons.")
+        AddReport("Sabotage!","Your "+solname(_sol)+" system has been attacked by saboteurs! "+Int(reduce)+" cannons were destroyed.",solowner(_sol),Str(_sol))
+    ElseIf _typ = 4 Then
+        reduce#      = slid_sabo * Rnd(.5,1.5)
+        reduce       = Min(reduce,pop(_sol))
+        pop(_sol)    = pop(_sol) - reduce
+        pop(_sol)    = Max(pop(_sol), 0)
+        If _human Then temp = MsgBox("Saboteurs killed "+Int(reduce)+" million people.")
+        AddReport("Sabotage!","Your "+solname(_sol)+" system has been attacked by saboteurs! "+Int(reduce)+" million people were killed due to poisoned food and water.",solowner(_sol),Str(_sol))
+    ElseIf _typ = 5 Then
+        reduce#          = slid_sabo * Rnd(.5,1.5)
+        reduce           = Min(reduce,basemaxpop(_sol))
+        basemaxpop(_sol) = basemaxpop(_sol) - reduce
+        basemaxpop(_sol) = Max(basemaxpop(_sol), 0)
+        pop(_sol)        = Min(basemaxpop(_sol), pop(_sol))
+        If _human Then temp = MsgBox("Saboteurs reduced the maximum population by "+Int(reduce)+" millions.")
+        AddReport("Sabotage!","Your "+solname(_sol)+" system has been attacked by saboteurs! Toxic waste was released in the environment and it can support "+Int(reduce)+" million less people.",solowner(_sol),Str(_sol))
+    EndIf
+    
+    If Rnd(1) > .9 Or Rand(1,40) => slid_sabo Then
+        If _human Then temp = MsgBox("They were caught...")
+        AddReport("Saboteur caught","A "+racename(curplayer)+" saboteur in system "+solname(_sol)+" has been caught.",solowner(_sol),Str(_sol))
+        If aiflag(solowner(_sol)) = 1 Then
+            ResetDiplMessage()
+            UpdateDiplMessage("Stop of sabotage",2)
+            UpdateDiplMessage("Declare war",3)
+            WriteDiplMsg(solowner(_sol),curplayer)
+        EndIf
+    EndIf
+End Function
+
+
+Function SpyTechnology(diplsel,slid_spy,_human=1)
+    costs = costs + slid_spy
+    randf# = Rnd(1) + Min(slid_spy/100, .5)
+    If randf > .5 Then
+        ok=0
+        For i = 1 To slid_spy*2
+            t = Rand(1,numTechs)
+            If researched(diplsel,t) => STARTED/2 Or researched(diplsel,t) <= -STARTED/2 Then ok = t: Exit
+        Next i
+        If ok = 0 Then
+            If _human Then temp = MsgBox("Spies couldn't find any useful research.")
+        ElseIf researched(curplayer,t) => READY-1 Or Abs(researched(diplsel,t)) < Abs(researched(curplayer,t)) Then
+            If _human Then temp = MsgBox("Spies only managed to steal research you already have.")
+        ElseIf Abs(researched(diplsel,t)) => Abs(researched(curplayer,t)) Then
+            researched(curplayer,t) = Abs(researched(diplsel,t))
+            If _human Then
+                If researched(curplayer,t) => READY-1 Then temp = MsgBox("Spies managed to stole "+techs(t,1)) Else temp = MsgBox("Spies managed to stole parts of "+techs(t,1))
+            EndIf
+        Else
+            If _human Then temp = MsgBox("Spies couldn't find any useful research.")
+        EndIf
+    Else
+        If _human Then temp = MsgBox("Spies couldn't find any useful research.")
+    EndIf
+    If Rnd(1) > .9 Or Rand(1,40) => slid_spy Then
+        If _human Then temp = MsgBox("You spies were caught...")
+        AddReport("Spy caught","A "+racename(curplayer)+" spy was caught after stealing some research.",diplsel,"diplomacy")
+        If aiflag(diplsel) = 1 Then
+            ResetDiplMessage()
+            UpdateDiplMessage("Stop of espionage",2)
+            UpdateDiplMessage("Declare war",3)
+            WriteDiplMsg(diplsel,curplayer)
+        EndIf
+    EndIf
+End Function
+
+
+Function UpdateRR(pl=1)
+    RR(pl) = 0
+    For i = 1 To maxsols
+        If solowner(i) = pl Then RR(pl) = RR(pl) + Int(slid_tech(i)/100 * prodres(i))
+    Next i
+End Function
+
+
+Function UpdateTotProd(pl=1)
+    totprod(pl) = 0
+    For i = 1 To maxsols
+        'prodres(i) = POP(i)*(1.0+prodbonus(pl))*9/10
+        If solowner(i) = pl Then totprod(pl) = totprod(pl) + prodres(i,1)
+    Next i
+    If pl=curplayer Then totprod(pl) = totprod(pl) - costs
+End Function
+
+
+Function prodres#(_sol,_igncosts=0)
+    PR# = POP(_sol)*(1.0+prodbonus(pl))*9/10
+    If solowner(_sol) = curplayer And totprod(solowner(_sol)) > 0 And costs > 0 And _igncosts = 0 Then _costs = costs * PR/(totprod(solowner(_sol))+costs) Else _costs = 0
+    Return ( PR - _costs )
+End Function
+
+
+Function maxpop#(_sol)
+    Return ( basemaxpop(_sol)*(1.0+maxpopbonus(solowner(_sol))) )
+End Function
+
+
+Function getPopIncrease#(_sol)
+    baseincrease# = pop(_sol) * (.02 + popgrowth(solowner(_sol))*(slid_eco(_sol)>25) )
+    Return ( ( (slid_eco(_sol)-25.0) / 75.0 ) * baseincrease )
+End Function
+
+
+Function CreateStars(_num=25,_typ=0)
+    maxsols = _num
+    For i = 1 To maxsols
+        solname(i) = Mid(letters,Rand(1,Len(letters)),1) + Str(Rand(1000,9999))
+        
+        basemaxpop(i) = Rand(100,700)
+        slid_ships(i) = 50
+        slid_defe(i) = 50
+        slid_eco(i) = 50
+        slid_tech(i) = 50
+        
+        'If solowner(i) <> 0 Then
+        '    pop(i) = Min(Rand(20,25),basemaxpop(i)-1)
+        '    ships(i) = 1
+        'EndIf
+
+        sol(i,0) = i
+        RandCoords:
+        If _typ = 0 Then
+            sol(i,1) = Rnd(-galaxydiameter/2,galaxydiameter/2)
+            sol(i,2) = Rnd(-galaxydiameter/2,galaxydiameter/2)
+            sol(i,3) = Rnd(-galaxydiameter/2,galaxydiameter/2)
+            td# = Distance3d(0,0,0, sol(i,1),sol(i,2),sol(i,3))
+            If td < 10 Or td > galaxydiameter/2 Then Goto RandCoords
+        ElseIf _typ = 1 Then
+            td# = Rnd(100,galaxydiameter/2)
+            ta# = Rnd(0,360)
+            sol(i,1) = Cos(ta)*td
+            sol(i,2) = Rnd(-400.0/td * 25.0, 400.0/td * 25.0)
+            sol(i,3) = Sin(ta)*td
+        EndIf
+        longestd# = 0
+        For j = 1 To i-1
+            td# = Distance3d(sol(i,1),sol(i,2),sol(i,3),sol(j,1),sol(j,2),sol(j,3))
+            If td# < 128 Then Goto RandCoords
+            If td>longestd Then longestd=td
+        Next j
+        'If longestd > 250 Then Goto RandCoords
+    
+        sol(i,7) = Rand(1,6)
+    Next i
+    PositionStars(-200,0,-300)
+    TransformPoints()
+End Function
+
+// MISC FUNCTIONS
+
+Function UpdateGeneralLists(pl)
+    FormatList(starlist)
+    FormatList(fleetlist)
+    For i = 1 To maxsols
+        If solowner(i) = pl Then AddListItem(starlist,solname(i))
+    Next i
+    For i = 1 To fleets
+        If fstats(i,1) = pl Then AddListItem(fleetlist,solname(i))
+    Next i
+    SortList(starlist)
+    SortList(fleetlist)
+End Function
+
+Function UpdateTradeLists(pl,targetrace)
+    FormatList(givelist)
+    FormatList(requestlist)
+    FormatList(threatlist)
+    If relations(pl,targetrace) < 3 Then AddListItem(givelist,"Alliance")
+    If relations(pl,targetrace) < 2 Then AddListItem(givelist,"Non-aggression treaty")
+    If relations(targetrace,pl) < 3 Then AddListItem(requestlist,"Alliance")
+    If relations(targetrace,pl) < 2 Then AddListItem(requestlist,"Non-aggression treaty")
+    If relations(targetrace,pl) > -2 Then AddListItem(threatlist,"Declare war")
+    AddListItem(givelist,"Stop of espionage")
+    AddListItem(requestlist,"Stop of espionage")
+    AddListItem(givelist,"Stop of sabotage")
+    AddListItem(requestlist,"Stop of sabotage")
+
+    For i = 1 To maxSols
+        // Offers
+        If solowner(i) = pl Then AddListItem(givelist,"System "+solname(i))
+        If solowner(i) = pl And ships(i) => 1 Then AddListItem(givelist,"Ship at "+solname(i))
+        // Requests
+        If solowner(i) = targetrace Then AddListItem(requestlist,"System "+solname(i))
+        If solowner(i) = targetrace Then AddListItem(requestlist,"Ship at "+solname(i))
+        // Threats
+        If solowner(i) = targetrace Then AddListItem(threatlist,"Attack to "+solname(i))
+    Next i
+    For f = 1 To fleets
+        // Offers
+        If fstats(f,1) = pl Then AddListItem(givelist,"Fleet "+fleetname(f))
+        // Requests
+        If fstats(f,1) = targetrace Then AddListItem(givelist,"Fleet "+fleetname(f))
+        // Threats
+        If fstats(f,1) = targetrace Then AddListItem(threatlist,"Attack against "+fleetname(f))
+    Next f
+    For t = 1 To numTechs
+        // Offers
+        If researched(pl,t) > READY-1 Then AddListItem(givelist,"Tech: "+techs(t,1))
+        // Requests
+        If researched(pl,t) < READY-1 And ( techs(t,8) = "none" Or researched(pl,getTechIdFromString(techs(t,8)))=>READY-1 ) And ( techs(t,9) = "none" Or researched(pl,getTechIdFromString(techs(t,9)))=>READY-1 ) And ( techs(t,10) = "none" Or researched(pl,getTechIdFromString(techs(t,10)))=>READY-1 ) Then AddListItem(requestlist,"Tech: "+techs(t,1))
+    Next t
+
+End Function
+
+
+Function CountAliveRaces()
+    k=0
+    For r = 1 To numPlayers
+        For i = 1 To maxsols
+            If solowner(i) = r And pop(i) > 0 Then k+1:Exit
+        Next i
+        For i = 1 To fleets
+            If fstats(i,1) = r And fstats(i,4) > 0 Then k+1:Exit
+        Next i
+    Next r
+    Return k
+End Function
+
+
+Function getWinner(_winningtype=0)
+    If _winningtype = 1 Then
+        If CountAliveRaces() = 0 Or CountAliveRaces() > 1 Then Return 0
+        For r = 1 To numPlayers
+            For i = 1 To maxsols
+                If solowner(i) = r And pop(i) > 0 Then Return r
+            Next i
+        Next r
+    EndIf
+    Return 0
+End Function
+
+
+Function CountKnownRaces(pl=1)
+    k=0
+    For i = 1 To numPlayers
+        If relations(pl,i) <> 0 Then k+1
+    Next i
+    Return k
+End Function
+
+
+Function UpdateKnownRaces()
+    For i = 1 To maxsols
+        For j = 1 To maxsols
+            If i<>j And relations(solowner(i),solowner(j)) = 0 And solowner(i) <> 0 And solowner(j) <> 0 Then
+                If Distance3d(sol(i,1),sol(i,2),sol(i,3),sol(j,1),sol(j,2),sol(j,3)) <= maxdist(solowner(j)) Then
+                    SetRelation(solowner(i),solowner(j),1)
+                    AddReport("New contact","You have made contact with the race "+racename(solowner(j)),solowner(i),Str(j))
+                    AddReport("New contact","You have made contact with the race "+racename(solowner(i)),solowner(j),Str(i))
+                EndIf
+            EndIf
+        Next j
+        For k = 1 To fleets
+            If relations(solowner(i),fstats(k,1)) = 0 And solowner(i) <> 0 And fstats(k,1) <> 0 Then
+                If Distance3d(sol(i,1),sol(i,2),sol(i,3),fleet(k,1),fleet(k,2),fleet(k,3)) <= maxdist(fstats(k,1)) Then
+                    SetRelation(solowner(i),fstats(k,1),1)
+                    AddReport("New contact","You have made contact with the race "+racename(fstats(k,1)),solowner(i),Str(-k))
+                    AddReport("New contact","You have made contact with the race "+racename(solowner(i)),fstats(k,1),Str(i))
+                EndIf
+            EndIf
+        Next k
+    Next i
+End Function
+
+
+Function CountHumans()
+    k=0
+    For i = 1 To numPlayers
+        If aiflag(i) = 0 Then k+1
+    Next i
+    Return k
+End Function
+
+
+Function AddReport(_title$, _desc$, pl=1, _link$="")
+    i = Int(reports(pl,0,0)) + 1
+    reports(pl,0,0) = Str(i)
+    reports(pl,i,0) = _link$
+    reports(pl,i,1) = _title$
+    reports(pl,i,2) = _desc$
+    AddLog("EventReport: "+_title$+": "+_desc$+" (link: "+_link$+")  player: "+pl)
+End Function
+
+
+Function AddGenericReport(_var$, _typ$, pl=1, _link$="")
+    If _typ$ = "research"           Then
+        AddReport("Research completed", "The research of "+_var$+" is complete.",pl,"research")
+    ElseIf _typ$ = "claimed"        Then
+        AddReport("New colony established", "You have established a new colony in the system of "+_var$+".", pl, _link$)
+    ElseIf _typ$ = "conquered"      Then
+        AddReport("Victorious invasion", "You have succesfully conquered the "+_var$+" system.", pl, _link$)
+    ElseIf _typ$ = "reached"        Then
+        AddReport("Fleet at destination", _var$+" has reached its destination.", pl, _link$)
+    ElseIf _typ$ = "failed"         Then
+        AddReport("Defeat", "Your invasion at "+_var$+" has failed and your forces were defeated.", pl, _link$)
+    ElseIf _typ$ = "defended"       Then
+        AddReport("Victorious defence", "You have succesfully defended the "+_var$+" system against enemy invasion.", pl, _link$)
+    ElseIf _typ$ = "lost"           Then
+        AddReport("System lost", "The enemy has invaded the "+_var$+" system!", pl, _link$)
+    ElseIf _typ$ = "newship"        Then
+        AddReport("New ship built", "A new ship has been constructed in the "+_var$+" system.", pl, _link$)
+    ElseIf _typ$ = "newcann"        Then
+        AddReport("New cannnon built", "A new cannon has been constructed in the "+_var$+" system.", pl, _link$)
+    ElseIf _typ$ = "tradedone"      Then
+        AddReport("Deal accepted", "Your deal with "+_var$+" has been accepted.",pl,"diplomacy")
+    ElseIf _typ$ = "tradedeclined"  Then
+        AddReport("Deal declined", "Your deal with "+_var$+" has been declined. Try revising the conditions.",pl,"diplomacy")
+    ElseIf _typ$ = "tradecannot"    Then
+        AddReport("Couln't carry out deal", "Your deal with "+_var$+" has been cancelled, because one of you didn't have what was needed.",pl,"diplomacy")
+    ElseIf _typ$ = "techgotten"     Then
+        AddReport("New technology", "You have been given the technology "+_var$+".",pl,"research")
+    ElseIf _typ$ = "shipgotten"     Then
+        AddReport("New ship", "You have been given a ship in "+_var$+".", pl, _link$)
+    ElseIf _typ$ = "solgotten"      Then
+        AddReport("New solar system", "You have been given the solar system "+_var$+".", pl, _link$)
+    EndIf
+End Function
+
+
+Function PutReportsToList(pl=1,lid=4)
+    FormatList(lid)
+    For i = 1 To Int(reports(pl,0,0))
+        If reports(pl,i,1) <> "" Then AddListItem(lid,reports(pl,i,1))
+    Next i
+End Function
+
+Function FormatReports(pl=1)
+    For i = 1 To Int(reports(pl,0,0))
+        reports(pl,i,0) = ""
+        reports(pl,i,1) = ""
+        reports(pl,i,2) = ""
+    Next i
+    reports(pl,0,0) = "0"
+End Function
+
+Function GetRacePicIdFromFileName(_file$)
+    For i = 1 To numRacePics
+        If racepicfiles(i) = _file$ Then Return i
+    Next i
+    Return Rand(1,numRacePics)
+End Function
+
+
+Function ResetDiplMessage()
+    diplmsg(0,1,0) = ""
+    diplmsg(0,2,0) = ""
+    diplmsg(0,3,0) = ""
+    For i = 1 To 999
+        diplmsg(i,1,0) = ""
+        diplmsg(i,1,1) = ""
+        diplmsg(i,2,0) = ""
+        diplmsg(i,2,1) = ""
+        diplmsg(i,3,0) = ""
+        diplmsg(i,3,1) = ""
+    Next i
+End Function
+
+
+Function getDiplMessage$(tone=0)
+    st$ = ""
+    If Int(diplmsg(0,1,0)) > 0 Then
+    Select tone
+        Case 1: st = "I would be honored to give you "
+        Case 2: st = "I offer you "
+        Case 3: st = "Take "
+    End Select
+    EndIf
+    
+    For i = 1 To Int(diplmsg(0,1,0))
+        If Int(diplmsg(i,1,0)) > 1 Then st = st + diplmsg(i,1,0)+" "
+        st = st + LowerFirst(diplmsg(i,1,1))
+        If i <> Int(diplmsg(0,1,0)) Then st = st + ", "
+    Next i
+    
+    If Int(diplmsg(0,2,0)) > 0 Then
+    If Int(diplmsg(0,1,0)) > 0 Then
+        Select tone
+            Case 1: st = st + ", if I could have "
+            Case 2: st = st + " in exchange for "
+            Case 3: st = st + " and give me "
+        End Select
+    Else
+        Select tone
+            Case 1: st = st + "Could you please give me "
+            Case 2: st = st + "I would need "
+            Case 3: st = st + "Give me right away "
+        End Select
+    EndIf
+    EndIf
+    
+    For i = 1 To Int(diplmsg(0,2,0))
+        If Int(diplmsg(i,2,0)) > 1 Then st = st + diplmsg(i,2,0)+" "
+        st = st + LowerFirst(diplmsg(i,2,1))
+        If i <> Int(diplmsg(0,2,0)) Then st = st + ", "
+    Next i
+    
+    If Int(diplmsg(0,3,0)) > 0 Then
+    If Int(diplmsg(0,1,0)) > 0 Or Int(diplmsg(0,2,0)) > 0 Then
+        Select tone
+            Case 1: st = st + ". If you don't accept, I have no other choice than to "
+            Case 2: st = st + ". If you don't accept, I am forced to "
+            Case 3: st = st + ". If you don't accept, I will certainly "
+        End Select
+    Else
+        Select tone
+            Case 1: st = st + "I regret to inform you that I "
+            Case 2: st = st + "I hereby inform you that I "
+            Case 3: st = st + "You have begged for "
+        End Select
+    EndIf
+    EndIf
+    
+    For i = 1 To Int(diplmsg(0,3,0))
+        If Int(diplmsg(i,3,0)) > 1 Then st = st + diplmsg(i,3,0)+" "
+        st = st + LowerFirst(diplmsg(i,3,1))
+        If i <> Int(diplmsg(0,3,0)) Then st = st + ", "
+    Next i
+    If st = "" Then st = "Add things to the message from the lists below"
+    Return st+"."
+End Function
+
+
+
+Function UpdateDiplMessage(_st$,_type)
+    For i = 1 To Int(diplmsg(0,_type,0))
+        If diplmsg(i,_type,1) = _st$ Then Exit
+    Next i
+    If i = Int(diplmsg(0,_type,0))+1 Then
+        diplmsg(0,_type,0) = Int(diplmsg(0,_type,0))+1
+        diplmsg(i,_type,1) = _st$
+        diplmsg(i,_type,0) = "1"
+    ElseIf Left(_st$,5) = "Ship " Then
+        diplmsg(i,_type,0) = Str(Int(diplmsg(i,_type,0))+1)
+    EndIf
+End Function
+
+
+
+Function WriteDiplMsg(_sender,_race,_tone=2)
+    If crypt=1 Then Decrypt messagesfile, messagesfile, cryptword
+    filu = OpenToEdit(messagesfile)
+    SeekFile filu, FileSize(messagesfile)
+        WriteLine filu, "newmsg=:"
+        WriteLine filu, "target= "+_race
+        WriteLine filu, "sender= "+_sender
+        WriteLine filu, "tone= "+_tone
+        For i = 1 To Int(diplmsg(0,1,0))
+            WriteLine filu, "offer= "+diplmsg(i,1,1)
+            If Int(diplmsg(i,1,0)) > 1 Then WriteLine filu, "quantity= "+diplmsg(i,1,0)
+        Next i
+        For i = 1 To Int(diplmsg(0,2,0))
+            WriteLine filu, "request= "+diplmsg(i,2,1)
+            If Int(diplmsg(i,2,0)) > 1 Then WriteLine filu, "quantity= "+diplmsg(i,2,0)
+        Next i
+        For i = 1 To Int(diplmsg(0,3,0))
+            WriteLine filu, "threat= "+diplmsg(i,3,1)
+            If Int(diplmsg(i,3,0)) > 1 Then WriteLine filu, "quantity= "+diplmsg(i,3,0)
+        Next i
+        WriteLine filu, "endmsg=:"
+    CloseFile filu
+    If crypt=1 Then Encrypt messagesfile, messagesfile, cryptword
+End Function
+
+
+'Function AddAIMsg(_st$, _type, _sender, _target)
+'    ResetDiplMessage()
+'    
+'    WriteDiplMsg(_sender, _race)
+'End Function
+
+
+Function HandleMessages(_race)
+    If FileExists("data/messages.tmp") Then DeleteFile "data/messages.tmp"
+    CopyFile messagesfile,"data/messages.tmp"
+    If FileExists(messagesfile) Then DeleteFile messagesfile
+    If crypt=1 Then Decrypt "data/messages.tmp", "data/messages.tmp", cryptword
+    f = OpenToRead("data/messages.tmp")
+    While Not EOF(f)
+        row$ = Trim(ReadLine(f))
+        key$ = GetWord(row,1,"=")
+        If key = "newmsg" Then
+            o=0:r=0:t=0
+            ResetDiplMessage()
+            While Not EOF(f)
+                row$ = Trim(ReadLine(f))
+                key$ = GetWord(row,1,"=")
+                If key = "endmsg" Then
+                    If target = _race Then
+                        If CanTrade(target,sender) Then
+                            If Message(sender,tone) = True Then DoTrade(target,sender) Else DoThreats(target,sender): AddGenericReport(racename(sender), "tradedeclined", target):AddGenericReport(racename(target), "tradedeclined", sender)
+                        Else
+                            AddGenericReport(racename(sender), "tradecannot", target)
+                            AddGenericReport(racename(target), "tradecannot", sender)
+                        EndIf
+                    Else
+                        WriteDiplMsg(sender,target,tone)
+                    EndIf
+                    Exit
+                ElseIf key = "target" Then
+                    target = Int(Trim(GetWord(row,2,"=")))
+                ElseIf key = "sender" Then
+                    sender = Int(Trim(GetWord(row,2,"=")))
+                ElseIf key = "tone" Then
+                    tone = Int(Trim(GetWord(row,2,"=")))
+                ElseIf key = "offer" Then
+                    o+1: latesttype = 1
+                    diplmsg(0,1,0) = Str(o)
+                    diplmsg(o,1,1) = Trim(GetWord(row,2,"="))
+                    diplmsg(o,1,0) = "1"
+                ElseIf key = "request" Then
+                    r+1: latesttype = 2
+                    diplmsg(0,2,0) = Str(r)
+                    diplmsg(r,2,1) = Trim(GetWord(row,2,"="))
+                    diplmsg(r,2,0) = "1"
+                ElseIf key = "threat" Then
+                    t+1: latesttype = 3
+                    diplmsg(0,3,0) = Str(t)
+                    diplmsg(t,3,1) = Trim(GetWord(row,2,"="))
+                    diplmsg(t,3,0) = "1"
+                ElseIf key = "quantity" Then
+                    Select latesttype
+                        Case 1: a=o
+                        Case 2: a=r
+                        Case 3: a=t
+                    End Select
+                    diplmsg(a,latesttype,0) = Trim(GetWord(row,2,"="))
+                EndIf
+            Wend
+        EndIf
+    Wend
+    CloseFile f
+    If FileExists("data/messages.tmp") Then DeleteFile "data/messages.tmp"
+    If crypt=1 Then Encrypt messagesfile, messagesfile, cryptword
+End Function
+
+
+
+Function CanTrade(_target, _sender)
+    For i = 1 To Int(diplmsg(0,2,0))
+        If GetWord(diplmsg(i,2,1),1) = "Ship" Then
+            wcount = CountWords(diplmsg(i,2,1))
+            s = GetStarId(GetWord(diplmsg(i,2,1),wcount))
+            If ships(s) < Int(diplmsg(i,2,0)) Then Return False
+        ElseIf GetWord(diplmsg(i,2,1),1) = "System" Then
+            wcount = CountWords(diplmsg(i,2,1))
+            s = GetStarId(GetWord(diplmsg(i,2,1),wcount))
+            If solowner(s) <> _target Then Return False
+        ElseIf GetWord(diplmsg(i,2,1),1) = "Tech:"
+            If researched(_target,GetTechIdFromString(Mid(diplmsg(i,2,1),7))) < READY-1 Then Return False
+        EndIf
+    Next i
+    Return True
+End Function
+
+
+Function DoTrade(_target, _sender)
+    AddGenericReport(racename(_target), "tradedone", _sender)
+    AddGenericReport(racename(_sender), "tradedone", _target)
+    For i = 1 To Int(diplmsg(0,1,0))
+        If GetWord(diplmsg(i,1,1),1) = "Ship" Then
+            wcount = CountWords(diplmsg(i,1,1))
+            s = GetStarId(GetWord(diplmsg(i,1,1),wcount))
+            ships(s) = ships(s) - Int(diplmsg(i,1,0))
+            NewFleet(_target,0,Int(diplmsg(i,1,0)),0,s,False)
+        ElseIf GetWord(diplmsg(i,1,1),1) = "System" Then
+            wcount = CountWords(diplmsg(i,1,1))
+            s = GetStarId(GetWord(diplmsg(i,1,1),wcount))
+            solowner(s) = _target
+        ElseIf GetWord(diplmsg(i,1,1),1) = "Tech:"
+            researched(_target,GetTechIdFromString(Mid(diplmsg(i,1,1),7))) = READY
+        ElseIf diplmsg(i,1,1) = "Alliance" Then
+            SetRelation(_target, _sender, 3)
+        ElseIf diplmsg(i,1,1) = "Non-aggression treaty" Then
+            SetRelation(_target, _sender, 2)
+        EndIf
+    Next i
+    For i = 1 To Int(diplmsg(0,2,0))
+        If GetWord(diplmsg(i,2,1),1) = "Ship" Then
+            wcount = CountWords(diplmsg(i,2,1))
+            s = GetStarId(GetWord(diplmsg(i,2,1),wcount))
+            ships(s) = ships(s) - Int(diplmsg(i,2,0))
+            NewFleet(_sender,0,Int(diplmsg(i,2,0)),0,s,False)
+            AddGenericReport(solname(s)+" by "+racename(_sender),"shipgotten",_target,s)
+        ElseIf GetWord(diplmsg(i,2,1),1) = "System" Then
+            wcount = CountWords(diplmsg(i,2,1))
+            s = GetStarId(GetWord(diplmsg(i,2,1),wcount))
+            solowner(s) = _sender
+            AddGenericReport(solname(s)+" by "+racename(_sender),"solgotten",_target,s)
+        ElseIf GetWord(diplmsg(i,2,1),1) = "Tech:"
+            researched(_sender,GetTechIdFromString(Mid(diplmsg(i,2,1),7))) = READY
+            AddGenericReport(Mid(diplmsg(i,1,1),7)+" by "+racename(_sender), "techgotten", _target)
+        ElseIf diplmsg(i,2,1) = "Alliance" Then
+            SetRelation(_target, _sender, 2)
+            AddReport("Alliance formed","You have formed an alliance with "+racename(_target)+".",_sender,"diplomacy")
+        ElseIf diplmsg(i,2,1) = "Non-aggression treaty" Then
+            SetRelation(_target, _sender, 2)
+            AddReport("Non-aggression treaty","You have formed a non-aggression treaty with "+racename(_target)+".",_sender,"diplomacy")
+        EndIf
+    Next i
+End Function
+
+
+Function DoThreats(_target, _sender)
+    For i = 1 To Int(diplmsg(0,3,0))
+        If diplmsg(i,3,1) = "Declare war" Then
+            SetRelation(_target, _sender, -2)
+        EndIf
+    Next i
+End Function
+
+
+Function SetRelation(_race1, _race2, _level)
+    relations(_race1, _race2) = _level
+    relations(_race2, _race1) = _level
+End Function
+
+
+
+Function RandRaceName$(l=0)
+    name$ = ""
+    If l = 0 Then l = Rand(1,5) + Rand(2,5)
+    For i = 1 To l
+        If b=>2 Then 
+            name$ = name$ + Mid(lettersA,Rand(1,Len(lettersA)),1)
+            a+1:b=0
+        ElseIf a=> 2 Then
+            name$ = name$ + Mid(lettersB,Rand(1,Len(lettersB)),1)
+            b+1:a=0
+        Else
+            If Rand(1,2) = 1 Then
+                name$ = name$ + Mid(lettersA,Rand(1,Len(lettersA)),1)
+                a+1:b=0
+            Else
+                name$ = name$ + Mid(lettersB,Rand(1,Len(lettersB)),1)
+                b+1:a=0
+            EndIf
+        EndIf
+    Next i
+    Return Mid(name$,1,1) + Lower(Mid(name$,2))
+End Function
+
+
+Function NewRace(name$="",colo=0,isai=0,pic=0,maxd#=250,spd#=5,prodb#=0,at#=0,de#=0)
+    numPlayers+1
+    If name$="" Then racename(numPlayers) = RandRaceName() Else racename(numPlayers) = name$
+    If colo=0 Then racecolor(numPlayers) = Rand(1,16581374) Else racecolor(numPlayers) = colo
+    If pic=0 Then racepic(numPlayers,0) = Rand(1,numRacePics) Else racepic(numPlayers,0) = pic
+    maxdist(numPlayers) = maxd 
+    speed(numPlayers) = spd
+    prodbonus(numPlayers) = prodb
+    attbonus(numPlayers) = at
+    defbonus(numPlayers) = de
+    relations(numPlayers,numPlayers) = 1
+    ai_act(numPlayers) = Rnd(.1,.9)
+    ai_mil(numPlayers) = Rnd(.1,.9)
+    ai_loy(numPlayers) = Rnd(.1,.9)
+    aiflag(numPlayers) = isai
+End Function
+
+
+'Function Enab(cur,act)
+'    If cur = act Then Return True Else Return False
+'End Function
+
+
+Function GetFleetId(item$)
+    For i = 1 To maxFleets
+        If fleetname(i) = item Then Return i
+    Next i
+    Return False
+End Function
+
+Function GetStarId(item$)
+    For i = 1 To maxSols
+        If solname(i) = item Then Return i
+    Next i
+    Return False
+End Function
+
+
+Function GetNearbyStar(_sol,_type=-1) // _type: -1 any, 0 empty, 1 enemy, 2 any but own, 3 own
+    j=0:dd#=10000
+    For i = 1 To maxsols
+        d# = Distance3d(sol(i,1),sol(i,2),sol(i,3), sol(_sol,1),sol(_sol,2),sol(_sol,3))
+        If d <= maxdist(solowner(_sol)) And d < dd And i <> _sol Then
+            If _type = -1 Then j=i:dd=d
+            If _type = 0 And solowner(i) = 0 Then j=i: dd=d
+            If _type = 1 And solowner(i) <> solowner(_sol) And relations(solowner(i),solowner(_sol)) < 0 Then j=i: dd=d
+            If _type = 2 And solowner(i) <> solowner(_sol) Then j=i: dd=d
+            If _type = 3 And solowner(i) = solowner(_sol) Then j=i: dd=d
+        EndIf
+    Next i
+    Return j
+End Function
+
+
+
+Function LowerFirst$(_st$)
+    Return (Lower(Left(_st$,1)) + Mid(_st$,2))
+End Function
+
+
+
+Function SaveGame(_file$="saves/save.txt")
+    If FileExists(messagesfile) Then CopyFile messagesfile, _file$
+
+    f = OpenToEdit(_file$)
+    SeekFile f, FileSize(_file$)
+    WriteLine f, "# Reaching for Stars Game Save File #"
+    WriteLine f, ""
+    // Save techs
+    WriteLine f, "# Technologies #"
+    For t = 1 To numTechs
+        WriteLine f, "technology=:"
+        WriteLine f, "name= " + techs(t,1)
+        WriteLine f, "category= " + techs(t,2)
+        WriteLine f, "desc= " + techs(t,3)
+        WriteLine f, "cost= " + techs(t,4)
+        If techs(t,5) <> "" Then WriteLine f, "effect= " + techs(t,5)
+        If techs(t,6) <> "" Then WriteLine f, "effect2= " + techs(t,6)
+        If techs(t,7) <> "" Then WriteLine f, "effect3= " + techs(t,7)
+        If techs(t,8) <> "none" Then WriteLine f, "preq= " + techs(t,8)
+        If techs(t,9) <> "none" Then WriteLine f, "preq2= " + techs(t,9)
+        If techs(t,10) <> "none" Then WriteLine f, "preq3= " + techs(t,10)
+    Next t
+
+    // Save players, their relations and researches
+    WriteLine f, "# Players #"
+    WriteLine f, "currentpl= "+curplayer
+    WriteLine f, "selected= "+sel
+    WriteLine f, "costs= "+costs
+    For i = 1 To numPlayers
+        WriteLine f, "player=:"
+        WriteLine f, "racename= "+racename(i)
+        WriteLine f, "password= "+password(i)
+        WriteLine f, "racecolor= "+racecolor(i)
+        WriteLine f, "prod= "+prodbonus(i)
+        WriteLine f, "att= "+attbonus(i)
+        WriteLine f, "def= "+defbonus(i)
+        WriteLine f, "groundatt= "+groundatt(i)
+        WriteLine f, "grounddef= "+grounddef(i)
+        WriteLine f, "dist= "+maxdist(i)
+        WriteLine f, "speed= "+speed(i)
+        WriteLine f, "popgrowth= "+popgrowth(i)
+        WriteLine f, "planetology= "+maxpopbonus(i)
+        WriteLine f, "rr= "+RR(i)
+        WriteLine f, "racepic= "+racepicfiles(racepic(i,0))
+        WriteLine f, "isai= "+aiflag(i)
+        WriteLine f, "aiact= "+ai_act(i)
+        WriteLine f, "aimil= "+ai_mil(i)
+        WriteLine f, "ailoy= "+ai_loy(i)
+        For t = 1 To numTechs        
+            If researched(i,t) < -STARTED/2 Or researched(i,t) > STARTED/2 Then WriteLine f,"tech=:"+techs(t,1)+":"+researched(i,t)
+        Next t
+        For j = 1 To numPlayers
+            If i<>j And relations(i,j) <> 0 Then WriteLine f, "relation=:"+i+":"+j+":"+relations(i,j)
+        Next j
+        For p = 1 To Int(reports(i,0,0))
+            WriteLine f, "report=:"
+            WriteLine f, "reporttitle= "+reports(i,p,1)
+            WriteLine f, "reportdesc= "+reports(i,p,2)
+            WriteLine f, "reportlink= "+reports(i,p,0)
+        Next p
+    Next i
+
+    // Save systems
+    WriteLine f, "# Solar Systems #"
+    WriteLine f, "curneb= "+curneb
+    For i = 1 To maxsols
+        WriteLine f, "solarsystem=:"
+        WriteLine f, "solname= "+solname(i)
+        WriteLine f, "solowner= "+solowner(i)
+        WriteLine f, "soli= "+sol(i,0)
+        WriteLine f, "solx= "+sol(i,1)
+        WriteLine f, "soly= "+sol(i,2)
+        WriteLine f, "solz= "+sol(i,3)
+        WriteLine f, "soltype= "+sol(i,7)
+        WriteLine f, "prodres= "+prodres(i)
+        WriteLine f, "maxpop= "+basemaxpop(i)
+        WriteLine f, "pop= "+pop(i)
+        WriteLine f, "ships= "+ships(i)
+        WriteLine f, "canns= "+canns(i)
+        WriteLine f, "slid_ships= "+slid_ships(i)
+        WriteLine f, "slid_defe= "+slid_defe(i)
+        WriteLine f, "slid_eco= "+slid_eco(i)
+        WriteLine f, "slid_tech= "+slid_tech(i)
+    Next i
+
+    // Save fleets
+    WriteLine f, "# Fleets #"
+    For i = 1 To fleets
+        If fstats(i,1) <> 0 Then
+            WriteLine f, "fleet=:"
+            WriteLine f, "fleetname= "+fleetname(i)
+            WriteLine f, "fleetx= "+fleet(i,1)
+            WriteLine f, "fleety= "+fleet(i,2)
+            WriteLine f, "fleetz= "+fleet(i,3)
+            WriteLine f, "fleetowner= "+fstats(i,1)
+            WriteLine f, "fleetdest= "+fstats(i,2)
+            WriteLine f, "fleetships= "+fstats(i,3)
+            WriteLine f, "fleetcolons= "+fstats(i,4)
+        EndIf
+    Next i
+
+    WriteLine f, "# EOF #"
+    CloseFile f
+    If crypt=1 Then Encrypt _file$, _file$, cryptword
+    AddLog("---- Game saved in "+_file$+" ----")
+    temp = MsgBox("Game saved.")
+End Function
+
+
+Function LoadGame(_file$="saves/save.txt")
+    ResetGame()
+    If crypt=1 Then Decrypt _file$, _file$, cryptword
+    LoadTechs(_file$)
+    
+    filu = OpenToRead(_file$)
+    msgfilu = OpenToWrite(messagesfile)
+        row$ = Trim(ReadLine(filu))
+        While row <> "# Reaching for Stars Game Save File #"
+            WriteLine msgfilu, row
+            row$ = Trim(ReadLine(filu))
+        Wend
+    CloseFile msgfilu
+    CloseFile filu
+    filu = OpenToRead(_file$)
+    
+    r=0:s=0:f=0:p=0
+    
+    While Not EOF(filu)
+        row$ = Trim(ReadLine(filu))
+        key$ = GetWord(row,1,"=")
+        
+        If key$ = "player" Then
+            r+1
+            relations(r,r) = 1
+        ElseIf key$ = "solarsystem" Then
+            s+1
+        ElseIf key$ = "fleet" Then
+            f+1
+            fstats(f,0) = f
+            fleet(f,0)  = -f
+        ElseIf key$ = "report" Then
+            p+1
+        ElseIf key$ = "currentpl" Then
+            curplayer = Int(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "selected" Then
+            sel = Int(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "costs" Then
+            costs = Int(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "racename" Then
+            racename(r) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "password" Then
+            password(r) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "racecolor" Then
+            racecolor(r) = Int(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "prod" Then
+            prodbonus(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "att" Then
+            attbonus(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "def" Then
+            defbonus(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "groundatt" Then
+            groundatt(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "grounddef" Then
+            grounddef(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "dist" Then
+            maxdist(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "speed" Then
+            speed(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "popgrowth" Then
+            popgrowth(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "planetology" Then
+            maxpopbonus(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "rr" Then
+            RR(r) = Float(Trim(GetWord(row,2,"=")))            
+        ElseIf key$ = "racepic" Then
+            racepic(r,0) = GetRacePicIdFromFileName(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "isai" Then
+            aiflag(r) = Int(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "aiact" Then
+            ai_act(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "aimil" Then
+            ai_mil(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "ailoy" Then
+            ai_loy(r) = Float(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "tech" Then
+            researched(r,GetTechIdFromString(GetWord(row,2,":"))) = Float(GetWord(row,3,":"))
+        ElseIf key$ = "relation" Then
+            relations( Int(GetWord(row,2,":")), Int(GetWord(row,3,":")) ) = Int(GetWord(row,4,":"))
+        ElseIf key$ = "reporttitle" Then
+            reports(r,p,1) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "reportdesc" Then
+            reports(r,p,2) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "reportlink" Then
+            reports(r,p,0) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "curneb" Then
+            curneb = Int(Trim(GetWord(row,2,"=")))
+        ElseIf key$ = "solname" Then
+            solname(s) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "solowner" Then
+            solowner(s) = Int(GetWord(row,2))
+        ElseIf key$ = "soli" Then
+            sol(s,0) = Int(GetWord(row,2))
+        ElseIf key$ = "solx" Then
+            sol(s,1) = Float(GetWord(row,2))
+        ElseIf key$ = "soly" Then
+            sol(s,2) = Float(GetWord(row,2))
+        ElseIf key$ = "solz" Then
+            sol(s,3) = Float(GetWord(row,2))
+        ElseIf key$ = "soltype" Then
+            sol(s,7) = Int(GetWord(row,2))
+        ElseIf key$ = "prodres" Then
+            prodres(s) = Float(GetWord(row,2))
+        ElseIf key$ = "maxpop" Then
+            basemaxpop(s) = Float(GetWord(row,2))
+        ElseIf key$ = "pop" Then
+            pop(s) = Float(GetWord(row,2))
+        ElseIf key$ = "popgrowth" Then
+            popgrowth(s) = Float(GetWord(row,2))
+        ElseIf key$ = "ships" Then
+            ships(s) = Float(GetWord(row,2))
+        ElseIf key$ = "canns" Then
+            canns(s) = Float(GetWord(row,2))
+        ElseIf key$ = "slid_ships" Then
+            slid_ships(s) = Float(GetWord(row,2))
+        ElseIf key$ = "slid_defe" Then
+            slid_defe(s) = Float(GetWord(row,2))
+        ElseIf key$ = "slid_eco" Then
+            slid_eco(s) = Float(GetWord(row,2))
+        ElseIf key$ = "slid_tech" Then
+            slid_tech(s) = Float(GetWord(row,2))
+        
+        ElseIf key$ = "fleetname" Then
+            fleetname(f) = Trim(GetWord(row,2,"="))
+        ElseIf key$ = "fleetx" Then
+            fleet(f,1) = Float(GetWord(row,2))
+        ElseIf key$ = "fleety" Then
+            fleet(f,2) = Float(GetWord(row,2))
+        ElseIf key$ = "fleetz" Then
+            fleet(f,3) = Float(GetWord(row,2))
+        ElseIf key$ = "fleetowner" Then
+            fstats(f,1) = Int(GetWord(row,2))
+        ElseIf key$ = "fleetdest" Then
+            fstats(f,2) = Int(GetWord(row,2))
+        ElseIf key$ = "fleetships" Then
+            fstats(f,3) = Int(GetWord(row,2))
+        ElseIf key$ = "fleetcolons" Then
+            fstats(f,4) = Int(GetWord(row,2))
+        EndIf
+    Wend
+    numPlayers = r
+    maxsols = s
+    fleets = f
+    numsendships = 0
+    numsendcolons = 0
+    CloseFile filu
+    If crypt=1 Then Encrypt _file$, _file$, cryptword
+    PositionStars(-200,0,-300)
+    UpdateKnownRaces()
+    UpdateKnownSpace(curplayer)
+    UpdateTotProd(curplayer)
+    UpdateRR(curplayer)
+    UpdateGeneralLists(curplayer)
+    AddLog("---- Game loaded from "+_file$+" ----")
+    If gLoadingCompleted = 0 Then Load()
+    temp = MsgBox("Game loaded.")
+    If CountHumans() > 1 Then Verify()
+End Function
+
+
+
+
+Function ResetGame()
+    For i = 1 To maxplayers
+        racename(i)=""
+        racecolor(i)=0
+        prodbonus(i)=0
+        attbonus(i)=0
+        defbonus(i)=0
+        groundatt(i)=0
+        grounddef(i)=0
+        maxdist(i)=0
+        speed(i)=0
+        popgrowth(i)=0
+        maxpopbonus(i)=0
+        RR(i)=0
+        For t = 1 To maxTechs        
+            researched(i,t) = 0
+        Next t
+        For j = 1 To maxplayers
+            relations(i,j) = 0
+        Next j
+        FormatReports(i)
+    Next i
+    numPlayers=0
+
+    For i = 1 To maxmaxsols
+        solname(i)=""
+        solowner(i)=0
+        For j = 1 To 10
+            sol(i,j)=0
+        Next j
+        prodres(i)=0
+        basemaxpop(i)=0
+        pop(i)=0
+        ships(i)=0
+        canns(i)=0
+        slid_ships(i)=25
+        slid_defe(i)=25
+        slid_eco(i)=25
+        slid_tech(i)=25
+    Next i
+    maxsols = 0
+    For i = 1 To maxfleets
+        fleetname(i)=""
+        fstats(i,0)=0
+        fleet(i,1)=0
+        fleet(i,2)=0
+        fleet(i,3)=0
+        fstats(i,1)=0
+        fstats(i,2)=0
+        fstats(i,3)=0
+        fstats(i,4)=0
+    Next i
+    fleets = 0
+    If FileExists(messagesfile) Then DeleteFile messagesfile 
+    ResetTechs()
+    ResetDiplMessage()
+End Function
+
+
+
+// POINT FUNCTIONS
+
+Function TransformPoints(xdiff#=0,ydiff#=0,zdiff#=0)
+    For i = 0 To maxsols
+    
+        x# = sol(i,1)-xdiff
+        y# = sol(i,2)-ydiff
+        z# = sol(i,3)-zdiff
+
+        nx# = x * mStars(1) + y * mStars(5) + z * mStars(9)  + mStars(13)' + xdiff
+        ny# = x * mStars(2) + y * mStars(6) + z * mStars(10) + mStars(14)' + ydiff
+        nz# = x * mStars(3) + y * mStars(7) + z * mStars(11) + mStars(15)' + zdiff
+    
+        sol(i,6) = False
+    
+        ' Project screen coordinates...
+        dist# = LENS - nz
+        If dist > 0 Then
+            sol(i,4) = halfw + (LENS * nx / dist)
+            sol(i,5) = halfh - (LENS * ny / dist)
+        Else
+            sol(i,6) = True 'cull
+        End If
+
+        ' Calculate size...
+        D = Distance3d(0,0,0,nx,ny,nz)
+        'D = Abs(nz)
+        D = Int(D/10)
+        D = Max(1,D)
+        D = Min(64,D)
+        sol(i,8) = 65-D
+
+    Next i
+
+    For i = 1 To fleets
+        If fstats(i,1) <> 0 Then
+            x# = fleet(i,1)-xdiff
+            y# = fleet(i,2)-ydiff
+            z# = fleet(i,3)-zdiff
+        
+            nx# = x * mStars(1) + y * mStars(5) + z * mStars(9)  + mStars(13)
+            ny# = x * mStars(2) + y * mStars(6) + z * mStars(10) + mStars(14)
+            nz# = x * mStars(3) + y * mStars(7) + z * mStars(11) + mStars(15)
+        
+            fleet(i,6) = False
+        
+            ' Project screen coordinates...
+            dist# = (LENS - nz)
+            If dist > 0 Then
+                fleet(i,4) = halfw + (LENS * nx / dist)
+                fleet(i,5) = halfh - (LENS * ny / dist)
+            Else
+                fleet(i,6) = True 'cull
+            End If
+        
+            ' Calculate size...
+            D = Distance3d(0,0,0,nx,ny,nz)
+            D = Int(D/10)
+            D = Max(1,D)
+            D = Min(64,D)
+            fleet(i,8) = 65-D
+        Else
+            ' If fleet is erased, cull
+            fleet(i,6) = True
+        EndIf
+    Next i
+
+    ' arrange DrawOrder
+    For i = 1 To maxsols
+        For t = 0 To 9
+            draworder(i,t) = sol(i,t)
+        Next t
+    Next i
+    For i = maxsols+1 To maxsols+fleets
+        For t = 0 To 9
+            draworder(i,t) = fleet(i-maxsols,t)
+        Next t
+    Next i
+    ' sorting algorithm
+    For i = 1 To maxsols+fleets
+        For j = 1 To maxsols+fleets-i
+            If draworder(j,8) > draworder(j+1,8) ' Or draworder(j,7) = 0 
+                For t = 0 To 9
+                    sorttemp(t) = draworder(j,t)
+                    draworder(j,t) = draworder(j+1,t)
+                    draworder(j+1,t) = sorttemp(t)
+                Next t
+            EndIf
+        Next j
+    Next i
+    
+    calcstars = False
+End Function
+
+
+
+// - OBJECT FUNCTIONS -
+
+Function RotateStars(ang#, xcomp#, ycomp#, zcomp#)
+    QuaternionFromAxisAngle(ang, xcomp, ycomp, zcomp)
+    Normalize(0)
+    MultiplyQuaternion()
+    Normalize(1)
+    CreateMatrix()
+    calcstars = True    
+End Function
+
+Function TranslateStars(xadd#=0, yadd#=0, zadd#=0)
+    mStars(13) = mStars(13) + xadd
+    mStars(14) = mStars(14) + yadd
+    mStars(15) = mStars(15) + zadd
+    calcstars = True    
+End Function
+
+Function PositionStars(x#=0, y#=0, z#=0)
+    mStars(13) = x
+    mStars(14) = y
+    mStars(15) = z
+    calcstars = True
+End Function
+
+
+
+// - MATH FUNCTIONS -
+
+// Returns the number with given amount of decimals
+Function dec#(num#,decims)
+    If decims = 0 Then Return Int(num)
+    ret# = Int(num*10^decims)
+    Return ret#/10^decims
+End Function
+
+// Returns the sign of the given number (-1, 0, 1)
+Function Sign(num#)
+    If num>0 Then Return 1
+    If num<-1 Then Return -1
+    Return 0
+End Function
+
+// Calculates the distance between two points in 3d Space
+Function Distance3d#(x1#,y1#,z1#,x2#,y2#,z2#)
+    Return Sqrt((x2-x1)^2+(y2-y1)^2+(z2-z1)^2)
+End Function
+
+
+Include "ui.cb"

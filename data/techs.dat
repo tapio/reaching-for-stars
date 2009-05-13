@@ -1,0 +1,388 @@
+####################################################
+# Reaching for Stars! Technologies definition file #
+####################################################
+# INFO #
+########
+
+# FORMAT
+
+# Required fields:
+#
+# name=
+#    The name of the research project
+# desc=
+#    Description of the effects of the technology
+# category=
+#    Category of the technology, one of the following:
+#       * Construction
+#       * Military
+#       * Planetology
+#       * Propulsion
+# cost=
+#    Amount of RR to complete (actual amount varies, this is a guide line)
+#
+# Optional fields:
+#
+# effect=   OR   effect1=
+#    The effect of the technology, see list of possible variables and parameters below
+#    Note: it isn't necessary to have any effects, the tech can also serve as just a prequisite
+# effect2=
+#    Another effect (if needed)
+# effect3=
+#    Third effect (if needed)
+# preq=     OR   preq1=
+#    The name of the technology that must be researched before this project is available (optional)
+# preq2= 
+#    Another prequisition (if needed)
+# preq3= 
+#    Third prequisition (if needed)
+
+# List of variables and their possible values for effects
+#  + sign after the variable means that the parameter is added to a certain in-game variable/multiplier
+#  = sign after the variable means that a certain in-game variable is set to the value of the parameter
+#  Neither sign is part of the actual variable name, and therefore they don't appear in the tech definitions
+# * attackmultiplier        +
+# * defencemultiplier       +
+# * groundattackmultiplier  +
+# * grounddefencemultiplier +
+# * distance                =
+# * speed                   =
+# * prod                    +
+# * maxpop                  +
+# * popgrowth               +
+
+###############
+# DEFINITIONS #
+###############
+
+# Ships
+
+name= Targeting Computers I
+desc= Improves the accuracy of weapons and therefore makes them more efficient.
+category= Military
+cost= 300
+effect= attackmultiplier 0.2
+
+name= Targeting Computers II
+desc= Improves the accuracy of weapons and therefore makes them more efficient.
+category= Military
+cost= 900
+effect= attackmultiplier 0.2
+preq= Targeting Computers I
+preq2= Quantium Computer
+
+# Weapons
+
+name= Proton Torpedos
+desc= Gives the ships a very powerful medium/long range anti-capital ship weapon.
+category= Military
+cost= 1800
+effect= attackmultiplier 0.3
+
+name= Plasma Bolt Launcher
+desc= Gives the ships an effective short/medium range weapon.
+category= Military
+cost= 1000
+effect= attackmultiplier 0.2
+preq= Particle Accelerator
+
+name= Machinegun Deflector System
+desc= Equips the ships with automatic machineguns that are able to destroy most incoming missiles before they hit.
+category= Military
+cost= 2200
+effect= defencemultiplier 0.5
+preq= Targeting Computers I
+
+name= AI Guiged Missiles
+desc= Equips the ships with intelligent missiles that are very hard to intercept.
+category= Military
+cost= 2500
+effect= attackmultiplier 0.5
+preq= Artificial Intelligency I
+preq2= Targeting Computers II
+
+name= Ion Cannon
+desc= A powerful cannon.
+category= Military
+cost= 2300
+effect attackmultiplier 0.4
+preq= Ion Engines
+
+name= Particle Projectile Cannon
+desc= Extremely powerful weapon launching projectiles from a particle accelerator with velocity near the speed of light.
+category= Military
+cost= 1900
+effect attackmultiplier 0.6
+preq= Particle Accelerator
+
+# Defence
+
+name= Force Absorbing Materials I
+desc= Allows ships' armor to withstand more damage.
+category= Military
+cost= 900
+effect= defencemultiplier 0.3
+
+name= Force Absorbing Materials II
+desc= Allows ships' armor to withstand more damage.
+category= Military
+cost= 1200
+effect= defencemultiplier 0.3
+preq= Force Absorbing Materials I
+
+name= Shield Generator I
+desc= Generates a weak protective energy field around the ships.
+category= Military
+cost= 1400
+effect= defencemultiplier 0.2
+
+name= Shield Generator II
+desc= Improves the protective energy field around the ships.
+category= Military
+cost= 2400
+effect= defencemultiplier 0.4
+preq= Shield Generator I
+
+name= Shield Generator III
+desc= Makes the protective energy field around the ships very strong.
+category= Military
+cost= 3600
+effect= defencemultiplier 0.4
+preq= Shield Generator II
+
+# Colonist Techs
+
+name= Blaster Rifle
+desc= This rifle type allows colonists to fire very effective blasts, though the range is limited.
+category= Military
+cost= 300
+effect= groundattackmultiplier 0.1
+
+name= Pulse Rifle
+desc= This rifle allows colonists to fire death rapidly over long distances.
+category= Military
+cost= 500
+effect= groundattackmultiplier 0.2
+
+name= Portable Nuke Launcher
+desc= This weapon allows colonists to destroy large quantities of enemies at once.
+category= Military
+cost= 1000
+effect= groundattackmultiplier 0.4
+
+name= Plasma Rifle
+desc= This rifle fires extremely hot plasma destroying almost everything on its way.
+category= Military
+cost= 1200
+effect= groundattackmultiplier 0.4
+preq= Particle Accelerator
+
+name= Terminator I
+desc= These combat robots improve the ground combat capabilities of your colonists significantly.
+category= Military
+cost= 800
+effect= groundattackmultiplier 0.3
+preq= Artificial Intelligency I
+
+name= Terminator Mark II
+desc= These advanced combat robots improve the ground combat capabilities of your colonists even further.
+category= Military
+cost= 1500
+effect= groundattackmultiplier 0.3
+preq= Terminator I
+preq2= Artificial Intelligency II
+
+name= Personal Shield Generator I
+desc= This device produces protective energy field around a single colonist.
+category= Military
+cost= 800
+effect= grounddefencemultiplier 0.2
+preq= Shield Generator I
+
+name= Personal Shield Generator II
+desc= This device produces stronger protective energy field around a single colonist.
+category= Military
+cost= 2000
+effect= grounddefencemultiplier 0.2
+preq= Shield Generator II
+
+name= Power Armor I
+desc= These heavy protective shells give colonists good protection while built-in actuators help with movement.
+category= Military
+cost= 600
+effect= grounddefencemultiplier 0.3
+preq= Force Absorbing Materials I
+
+name= Power Armor II
+desc= These heavy protective shells give colonists even better protection while built-in actuators help with movement.
+category= Military
+cost= 1500
+effect= grounddefencemultiplier 0.3
+preq= Power Armor I
+
+
+# Engines
+
+name= Ion Engines
+desc= These engines allow more swift travelling.
+category= Propulsion
+cost= 600
+effect= speed 8
+
+name= Nuclear Pulse Thruster
+desc= This engine type increase the speed of ships.
+category= Propulsion
+cost= 1200
+effect= speed 15
+
+name= Antimatter Engines
+desc= These engines would allow travelling over great distances fast.
+category= Propulsion
+cost= 2500
+effect= speed 20
+effect2= distance 350
+preq= Particle Accelerator
+
+name= Gravitational Field Modifier
+desc= This device allows ships to travel up to three light years per year.
+category= Propulsion
+cost= 4000
+effect= speed 75
+preq= Antimatter Engines
+preq2= Particle Accelerator
+preq3= Quantium Computer
+
+name= Wormhole Generator
+desc= This device allows ships to cover enormous distance almost instantly.
+category= Propulsion
+cost= 12000
+effect= speed 300
+effect2= distance 800
+preq= Gravitational Field Modifier
+
+
+
+# Planets
+
+name= Terraforming I
+desc= Methods for making a planet more habitable. Increases maximum population and population growth.
+category= Planetology
+cost= 400
+effect= maxpop 0.1
+effect2= popgrowth 0.05
+
+name= Terraforming II
+desc= Methods for making a planet more habitable. Increases maximum population and population growth.
+category= Planetology
+cost= 800
+effect= maxpop 0.1
+effect2= popgrowth 0.05
+preq= Terraforming I
+
+name= Terraforming III
+desc= Methods for making a planet more habitable. Increases maximum population and population growth.
+category= Planetology
+cost= 1400
+effect= maxpop 0.2
+effect2= popgrowth 0.05
+preq= Terraforming II
+
+name= Terraforming IV
+desc= Methods for making a planet more habitable. Increases maximum population and population growth.
+category= Planetology
+cost= 3500
+effect= maxpop 0.2
+effect2= popgrowth 0.05
+preq= Terraforming III
+
+name= Terraforming V
+desc= Methods for making a planet more habitable. Increases maximum population and population growth.
+category= Planetology
+cost= 5000
+effect= maxpop 0.2
+effect2= popgrowth 0.05
+preq= Terraforming IV
+
+name= Ice Planet Colonization
+desc= This allows the colonization of very cold ice planets and therefore increases the maximum population of your solar systems.
+category= Planetology
+cost= 800
+effect= maxpop 0.8
+
+name= Hot Planet Colonization
+desc= This allows the colonization of extremely hot planets and therefore increases the maximum population of your solar systems.
+category= Planetology
+cost= 800
+effect= maxpop 0.8
+
+name= Gas Planet Colonization
+desc= This allows the colonization of giant gas planets which are very common and therefore increases the maximum population of your solar systems dramatically.
+category= Planetology
+cost= 2500
+effect= maxpop 1.6
+
+name= Agriculture Improvements
+desc= Improves food production.
+category= Planetology
+cost= 400
+effect= maxpop 0.1
+effect2= popgrowth 0.05
+
+
+# Constructioning
+
+name= Industrial Robots I
+desc= These robots increase the efficiency of industrial production.
+category= Construction
+cost= 600
+effect= prod 0.3
+
+name= Industrial Robots II
+desc= These advanced robots increase the efficiency of industrial production further.
+category= Construction
+cost= 1200
+effect= prod 0.3
+preq= Industrial Robots I
+preq2= Artificial Intelligency I
+
+name= Quantium Computer
+desc= Very powerful computer technology that allows many further applications.
+category= Construction
+cost= 700
+
+name= Artificial Intelligency I
+desc= Makes machines intelligent allowing many further applications.
+category= Construction
+cost= 500
+
+name= Artificial Intelligency II
+desc= Makes machines very smart allowing many further applications.
+category= Construction
+cost= 1000
+preq= Artificial Intelligency I
+
+name= Skyscrapers I
+desc= Allows the construction of tall buildings and thus increases the maximum population.
+category= Construction
+cost= 200
+effect= maxpop 0.2
+
+name= Skyscrapers II
+desc= Allows the construction of extremely tall buildings and thus increases the maximum population.
+category= Construction
+cost= 800
+effect= maxpop 0.2
+preq= Skyscrapers I
+
+name= Underwater Constructioning
+desc= Allows to construct buildings under water and thus increases the maximum population.
+category= Construction
+cost= 600
+effect= maxpop 0.2
+
+name= Particle Accelerator
+desc= Particle accelerators allow advanced researching methods in nuclear physics.
+category= Construction
+cost= 800
+
+

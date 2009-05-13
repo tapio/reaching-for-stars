@@ -1,0 +1,964 @@
+// PROJECT: Reaching for Stars
+// VERSION: beta 3
+// AUTHOR:  Tapio Vierros
+// FILE:    ui.cb - user interface functions
+// LICENSE: See LICENSE-file
+
+
+Function DebugPrint(_txt$,_wait=1)
+    Color cbRed : Print _txt$
+    If _wait=1 Then WaitKey
+End Function
+
+
+
+Function InputBox$(promt$,defaulttxt$="",passchar$="")
+    ClearKeys()
+    answer$ = "10000"+defaulttxt$
+    SetFont normalfont
+    Repeat
+        If Mid(answer,1,1) <> "1" Then answer = "1"+Mid(answer,2)
+        Display(ON)
+        DrawImage inputboxbg,halfw-100,halfh-30
+        Color cbSilver
+        RowText(promt$,halfw-90,halfw+90,halfh-25)
+        SetFont normalfont
+        Color 100,100,255
+        answer = Inputfield(answer,halfw-90,halfh+15,180,20,-1,passchar$)
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        If KeyHit(1) Then activetab-2: Return ""
+        DrawScreen
+    Until KeyHit(cbkeyReturn)
+    Return GetInputfieldText(answer)
+End Function
+
+Function MsgBox$(promt$,but1$="OK",but2$="")
+    ClearKeys()
+    ClearMouse()
+    Repeat
+        Display(ON)
+        DrawImage inputboxbg,halfw-100,halfh-30
+        Color cbSilver
+        SetFont smallfont
+        RowText(promt$,halfw-90,halfw+90,halfh-25,ON)
+        SetFont normalfont
+        If but2 = "" Then
+            b1 = button(but1,halfw-50,halfh+20,100,15)
+        Else
+            b1 = button(but1,halfw-90,halfh+20,80,15)
+            b2 = button(but2,halfw+10,halfh+20,80,15)
+        EndIf
+        If b1 Or KeyHit(cbkeyreturn) Then ClearMouse():Return 1
+        If b2 Or KeyHit(1) Then ClearMouse():Return 0
+        If KeyHit(cbkeyF11) Then ScreenShot "shot" + Str(Rand(1000,99999)) + ".bmp"
+        DrawScreen
+    Forever
+End Function
+
+
+Function Box2(x1#,y1#,x2#,y2#,fill=0)
+    Box x1,y1,x2-x1,y2-y1,fill
+End Function
+
+
+//Piirtää pisteytetyn viivan
+Function DottedLine(x1,y1, x2,y2, tiheys=-1, vaihe#=0)
+    If tiheys=-1 Then tiheys=3 'SÄÄDÄ TIHEYDEN OLETUSARVO TÄHÄN 5:N TILALLE!
+
+    iMax# = Max(Abs(x1-x2),Abs(y1-y2))
+    Dot x1,y1 'Ensimmäinen piste ja
+    Dot x2,y2 'Päätepiste piirretään varmasti
+    Repeat
+        i#=i+tiheys
+        If i<=iMax Then
+            pros# = i/iMax
+            x=x1+(x2-x1)*(pros + vaihe/iMax)
+            y=y1+(y2-y1)*(pros + vaihe/iMax)
+            Dot x,y
+        End If
+    Until i >= iMax
+End Function
+
+
+//Piirtää katkoviivan
+Function DashedLine(x1,y1, x2,y2, tiheys=-1, vaihe#=0)
+    If tiheys=-1 Then tiheys=20 'SÄÄDÄ TIHEYDEN OLETUSARVO TÄHÄN 20:N TILALLE!
+
+    d=GetAngle(x1,y1, x2,y2)
+    iMax# = Max(Abs(x1-x2),Abs(y1-y2))
+    xMax = Max(x1,x2) : xMin = Min(x1,x2)
+    yMax = Max(y1,y2) : yMin = Min(y1,y2)
+    i#=-tiheys
+    Repeat
+        i=i+tiheys
+        If i<=iMax Then
+            pros# = i/iMax
+            x = x1+(x2-x1)*(pros + vaihe/iMax)
+            y = y1+(y2-y1)*(pros + vaihe/iMax)
+            xx = x+Cos(d)*tiheys/2
+            xx = Min(Max(xx,xMin),xMax)
+            yy = y-Sin(d)*tiheys/2
+            yy = Min(Max(yy,yMin),yMax)
+            Line x,y, xx,yy
+        End If
+    Until i>=iMax
+End Function
+
+
+Function Line2(x1#,y1#,x2#,y2#,r1,g1,b1,r2,g2,b2)
+    linedir#    = GetAngle(x1,y1,x2,y2)
+    linelength# = Distance(x1,y1,x2,y2)
+    r_step#     = (r2-r1) / linelength
+    g_step#     = (g2-g1) / linelength
+    b_step#     = (b2-b1) / linelength
+    For i = 0 To linelength
+        Color r1+i*r_step, g1+i*g_step, b1+i*b_step
+        Dot x1+Cos(linedir)*i, y1-Sin(linedir)*i
+    Next i
+End Function
+
+
+Function FatLine(x1#,y1#,x2#,y2#,_width=2)
+    a# = GetAngle(x1,y1,x2,y2)
+    d = Distance(x1,y1,x2,y2)
+    For i = 0 To d
+        Circle x1+Cos(a)*i-_width/2, y1-Sin(a)*i-_width/2, _width, ON
+    Next i
+    Line x,y,x+Cos(a)*l,y-Sin(a)*l
+End Function
+
+
+Function RowText(st$,x,x2,y,center=0)
+    If x + TextWidth(st$) < x2 Then
+        If center = ON Then Text (x+x2)/2-TextWidth(st$)/2,y,st$ Else Text x,y,st$
+    Else
+        For i = 1 To CountWords(st$)
+            word$ = GetWord(st$,i)
+            If x + TextWidth(sentence$) + TextWidth(word$) > x2 Then
+                If center = ON Then
+                    Text (x + x2)/2 - TextWidth(sentence$)/2, y, sentence$
+                Else
+                    Text x, y, sentence$
+                EndIf           
+                sentence$ = ""
+                y = y + TextHeight("I")
+            EndIf
+            sentence$ = sentence$ + word$ + " "
+        Next i
+        If sentence$ <> "" Then
+            If center = ON Then Text (x+x2)/2-TextWidth(sentence$)/2,y,sentence$ Else Text x,y,sentence$
+        EndIf
+    EndIf
+End Function
+
+
+Function slider#(PosX, PosY, Width, Height=10, maxval#=100.0, value#=0, enabl=1, showvalue=0)
+    valperpix# = Width / maxval#
+    If MouseX() >= PosX And MouseX() <= PosX + Width And MouseY() >= PosY And MouseY() <= PosY + Height And MouseDown(1) And enabl = True And dragtab = False Then
+        mx = width - (PosX + Width - MouseX())
+        value# = mx / valperpix#
+    EndIf
+    Color 192,192,192
+    Box PosX, PosY, Width, Height, ON
+    Color 100,100,100
+    Box PosX, PosY, Width, Height, OFF
+    Color 56,62,184
+    Box PosX+1, PosY+1, Min( Int((value#*valperpix#)/valperpix#)*valperpix# -2, Width-2 ), Height-2, ON
+    If showvalue = True Then
+        SetFont smallfont
+        Color 5,5,5
+        CenterText PosX+width/2, PosY+height/2, Int(value), 2
+    EndIf
+    Return value#
+End Function
+
+
+Function button(butTxt$,butPosX,butPosY,butWidth=0,butHeight=0,butEnab=1,butStyle=0)
+    If notmouse > 0 Then notmouse = notmouse - 1
+    If butWidth = 0 Then butWidth = TextWidth(butTxt$)+14
+    If butHeight = 0 Then butHeight = TextHeight(butTxt$)*1.3
+    butGradient = 0
+    If MouseDown(1) And butEnab = 1 And MouseX() >= butPosX And MouseX() <= butPosX + butWidth And MouseY() >= butPosY And MouseY() <= butPosY + butHeight And dragtab = False Then
+        Color 0,0,0
+        Box butPosX,butPosY,butWidth,butHeight,0
+        For i = 1 To butHeight-2
+            butGradient = 120+(i*(120/butHeight))
+            Color butGradient,butGradient,butGradient
+            Line butPosX+1,butPosY+i,butPosX+butWidth-2,butPosY+i
+        Next i
+        Color 120,120,120
+        Text butPosX+((butWidth-TextWidth(butTxt$))/2),butPosY+((butHeight-TextHeight(butTxt$))/2),butTxt$        
+        If butStyle = 1 Then Wait 50: Return 1
+    ElseIf MouseUp(1) And butEnab = 1 And MouseX() >= butPosX And MouseX() <= butPosX + butWidth And MouseY() >= butPosY And MouseY() <= butPosY + butHeight And dragtab = False Then
+        Color 0,0,0
+        Box butPosX,butPosY,butWidth,butHeight,0
+        For i = 1 To butHeight-2
+            butGradient = 255-(i*(120/butHeight))
+            Color butGradient,butGradient,butGradient
+            Line butPosX+1,butPosY+i,butPosX+butWidth-2,butPosY+i
+        Next i
+        Color 50,50,50
+        Text butPosX+((butWidth-TextWidth(butTxt$))/2),butPosY+((butHeight-TextHeight(butTxt$))/2),butTxt$        
+        If butStyle <> 1 Then Return 1
+    Else
+        Color 0,0,0
+        Box butPosX,butPosY,butWidth,butHeight,0
+        For i = 1 To butHeight-2
+            butGradient = 255-(i*(120/butHeight))
+            Color butGradient,butGradient,butGradient
+            Line butPosX+1,butPosY+i,butPosX+butWidth-2,butPosY+i
+        Next i
+        Color 50,50,50
+        Text butPosX+((butWidth-TextWidth(butTxt$))/2),butPosY+((butHeight-TextHeight(butTxt$))/2),butTxt$                  
+    EndIf
+    Return 0
+End Function
+
+Function MaskApprox(pic,r,g,b,offset)
+    Lock Image(pic)                                             'lock buffer
+    iw = ImageWidth(pic)
+    ih = ImageHeight(pic)
+    masked = MakeImage(iw,ih)                                   'create a new image
+    DrawToImage masked                                          'set graphics operations to it
+    For j = 1 To ih                                             'loop through every pixel in image
+        For i = 1 To iw
+            PickImageColor2 pic,i,j                              'take color from image
+            If getRGB(RED)=>r-offset And getRGB(RED)<=r+offset Then 'check if the color is within the boundaries
+                If getRGB(GREEN)=>g-offset And getRGB(GREEN)<=g+offset Then
+                    If getRGB(BLUE)=>b-offset And getRGB(BLUE)<=b+offset Then
+                        Color r,g,b                             'set the color to the mask color
+                    EndIf
+                EndIf
+            EndIf
+            Dot i,j                                             'draw the (adjusted) pixel
+        Next i
+    Next j
+    DrawToScreen                                                'set operations back to the screen
+    Unlock Image(pic)                                           'unlock the image buffer
+    MaskImage masked,r,g,b                                      'mask the manipulated image
+    Color 255,255,255                                           'set neutral color
+    Return masked                                               'return manipulated image
+EndFunction
+
+
+// Säätää kuvan kirkkautta.
+Function ImageBrightness(pic,bright)
+    Lock Image(pic)                                             'lock buffer
+    iw = ImageWidth(pic)
+    ih = ImageHeight(pic)
+    modified = MakeImage(iw,ih)                                 'create a new image
+    DrawToImage modified                                        'set graphics operations to it
+    For j = 0 To ih-1                                           'loop through every pixel in image
+        For i = 0 To iw-1
+            PickImageColor2 pic,i,j                             'take color from image
+            r = Max(Min(getRGB(RED)+bright,255) ,0)             'make sure the values are within [0,255]    
+            g = Max(Min(getRGB(GREEN)+bright,255) ,0)
+            b = Max(Min(getRGB(BLUE)+bright,255) ,0)
+            Color r,g,b                                         'set new color
+            Dot i,j                                             'draw the (adjusted) pixel
+        Next i
+    Next j
+    DrawToScreen                                                'set operations back to the screen
+    Unlock Image(pic)                                           'unlock the image buffer
+    Color 255,255,255                                           'set neutral color
+    Return modified                                             'return manipulated image
+EndFunction
+
+// Lisää kuvaan kohinaa.
+Function ApplyNoise(pic,offset=10,ign_r=0,ign_g=0,ign_b=0)
+    Lock Image(pic)                                             'lock buffer
+    iw = ImageWidth(pic)
+    ih = ImageHeight(pic)
+    modified = MakeImage(iw,ih)                                 'create a new image
+    DrawToImage modified                                        'set graphics operations to it
+    For j = 0 To ih-1                                           'loop through every pixel in image
+        For i = 0 To iw-1
+            PickImageColor2 pic,i,j                             'take color from image
+            r = getRGB(RED): g = getRGB(GREEN): b = getRGB(BLUE)
+            If r<>ign_r Then r = Max(Min(r+Rand(-offset,offset),255) ,0)
+            If g<>ign_g Then g = Max(Min(g+Rand(-offset,offset),255) ,0)
+            If b<>ign_b Then b = Max(Min(b+Rand(-offset,offset),255) ,0)
+            Color r,g,b                                         'set new color
+            Dot i,j                                             'draw the (adjusted) pixel
+        Next i
+    Next j
+    DrawToScreen                                                'set operations back to the screen
+    Unlock Image(pic)                                           'unlock the image buffer
+    Color 255,255,255                                           'set neutral color
+    Return modified                                             'return manipulated image
+EndFunction
+
+
+// Säätää kuvan värejä.
+Function ImageColorize(pic,r_off,g_off,b_off)
+    Lock Image(pic)                                             'lock buffer
+    iw = ImageWidth(pic)
+    ih = ImageHeight(pic)
+    modified = MakeImage(iw,ih)                                 'create a new image
+    DrawToImage modified                                        'set graphics operations to it
+    Color 255,255,255
+    Box 0,0,iw,ih,ON
+    For j = 0 To ih-1                                           'loop through every pixel in image
+        For i = 0 To iw-1
+            PickImageColor2 pic,i,j                             'take color from image
+            r = getRGB(RED)
+            g = getRGB(GREEN)
+            b = getRGB(BLUE)
+            'If (r<>0 And r<>255) Or (g<>0 And g<>255) Or (b<>0 And b<>255) Then
+            If Not (r=255 And g=255 And b=255) Then
+                r = Max(Min(r+r_off,255) ,0)              'make sure the values are within [0,255]    
+                g = Max(Min(g+g_off,255) ,0)
+                b = Max(Min(b+b_off,255) ,0)
+                Color r,g,b                                         'set new color
+                Dot i,j                                             'draw the (adjusted) pixel
+            EndIf
+        Next i
+    Next j
+    DrawToScreen                                                'set operations back to the screen
+    Unlock Image(pic)                                           'unlock the image buffer
+    Color 255,255,255                                           'set neutral color
+    Return modified                                             'return manipulated image
+EndFunction
+
+
+
+
+Function Inputfield(returns$,_x,_y,_w,_h,key=-1,passchar$="") 'by alodnal
+    If key = -1 Then key = GetKey()
+	old_r = getRGB(RED)
+	old_g = getRGB(GREEN)
+	old_b = getRGB(BLUE)
+	If _w < TextWidth("A") Then _w = TextWidth("A")
+	If _h < TextHeight("A") Then _h = TextHeight("A")
+	If Len(returns) < 5 Then
+		is_activated$ = "0"
+		keytime$ = "00"
+		blink$ = "00"
+		stri$ = ""
+	Else
+		is_activated$ = Left(returns,1)
+		keytime$ = Mid(returns,2,2)
+		blink$ = Mid(returns,4,2)
+		stri$ = Mid(returns,6,Len(returns)-5)	
+	EndIf
+	If MouseX() >= _x And MouseX() <= _x+_w And MouseY() >= _y And MouseY() <= _y+_h Then
+		If MouseHit(1) Then is_activated = "1": blink = "0"	
+	Else
+		If MouseHit(1) Then is_activated = "0"	
+	EndIf
+	If is_activated = "1" Then
+		blink = Int(blink) + 1
+		For a = 32 To 126
+			If key = a Or key = 145 Then
+				stri = StrInsert(stri,Len(stri)+1,Chr(key))
+				blink = "0"	
+			EndIf	
+		Next a
+		For b = 160 To 255
+			If key = 146 Or key = b Then	
+				stri = StrInsert(stri,Len(stri)+1,Chr(key))
+				blink = "0"	
+			EndIf	
+		Next b	
+		If Len(stri) > 0 Then
+			If KeyHit(14) Then	
+				stri = StrRemove(stri,Len(stri),1)
+				blink = "0"		
+			ElseIf KeyDown(14) Then	
+				If Int(keytime) < 20 Then keytime = Int(keytime) + 1
+				If Int(keytime) >= 20 Then stri = StrRemove(stri,Len(stri),1)
+				blink = "0"
+			Else
+				keytime = "00"			
+			EndIf		
+		EndIf	
+	EndIf
+	Color 64,64,64
+	Line _x-1,_y-1,_x+_w-1,_y-1
+	Line _x-1,_y,_x-1,_y+_h-1
+	Color 212,208,200
+	Line _x-1,_y+_h,_x+_w,_y+_h
+	Line _x+_w,_y-1,_x+_w,_y+_h-1
+	Color 128,128,128
+	Line _x-2,_y-2,_x+_w,_y-2
+	Line _x-2,_y-1,_x-2,_y+_h
+	Color old_r, old_g, old_b
+	Line _x-2,_y+_h+1,_x+_w+1,_y+_h+1
+	Line _x+_w+1,_y-2,_x+_w+1,_y+_h
+	Box _x,_y,_w,_h
+	Color 0,0,0
+	letter_amount = RoundDown(_w / TextWidth("A")) - 1
+    If passchar$ = "" Then
+        Text _x+1,_y+(_h/2)-(TextHeight("A")/2),Right(stri,letter_amount)
+    Else
+        char_amount = Min( Len(stri), letter_amount )
+        passstri$ = String(passchar$,char_amount)
+        Text _x+1,_y+(_h/2)-(TextHeight("A")/2),passstri$
+    EndIf
+    If is_activated = "1" Then
+		If Int(blink) < 21 Then
+            If passchar$ = "" Then
+                Line _x+TextWidth(Right(stri,letter_amount))+2,_y+(_h/2)-(TextHeight(stri)/2),_x+TextWidth(Right(stri,letter_amount))+2,_y+(_h/2)+(TextHeight(stri)/2)		
+            Else
+                Line _x+TextWidth(Right(passstri,char_amount))+2,_y+(_h/2)-(TextHeight(passstri)/2),_x+TextWidth(Right(passstri,char_amount))+2,_y+(_h/2)+(TextHeight(passstri)/2)		
+            EndIf
+		ElseIf Int(blink) > 39 Then	
+			blink = "0"		
+		EndIf	
+	EndIf
+	If Len(keytime) < 2 Then keytime = "0" + keytime
+	If Len(blink) < 2 Then blink = "0" + blink
+    Color old_r,old_g,old_b
+	Return is_activated + keytime + blink + stri
+End Function
+
+Function GetInputfieldText$(returns$)
+	Return Mid(returns,6,Len(returns)-5)
+End Function
+
+Function Checkbox(txt$,x,y,checked) //Windows XP tyylinen valintapainike, ohjeet: txt$=teksti, x=x-sijainti, y=y-sijainti, checked=valittu
+    old_r = getRGB(RED)
+    old_g = getRGB(GREEN)
+    old_b = getRGB(BLUE)
+    is_checked = checked
+    Color 28,81,128
+    Box x,y,13,13,0
+    'Color 243,243,241
+    Color 196,196,196
+    Box x+1,y+1,11,11
+    
+    
+    If MouseX() >= x and MouseX() <= x+13 And MouseY() >= y And MouseY() <= y+13 Then
+    Color 255,237,198
+    Box x+1,y+1,2,9
+    Box x+1,y+1,9,2
+    Color 252,214,135
+    Box x+10,y+1,2,7
+    Box x+1,y+10,7,2
+    Color 248,182,54
+    Box x+8,y+10,4,2
+    Box x+10,y+8,2,4
+    Line x+1,y+11,x+11,y+11
+    Line x+11,y+1,x+11,y+11
+    Color 250,200,103
+    Line x+8,y+10,x+8,y+11
+    Line x+10,y+8,x+11,y+8
+    Color 251,206,119
+    Line x+7,y+10,x+7,y+11
+    Line x+10,y+7,x+11,y+7
+    m=1
+    Else
+    m=0
+    EndIf
+    
+    If MouseX() >= x and MouseX() <= x+13 And MouseY() >= y And MouseY() <= y+13 And MouseDown(1) Then
+    Color 155,155,145
+    Dot x+1,y+1
+    For a=1 To 11
+    Color 155+a*7,155+a*7,145+a*7
+    Line x+1,y+a,x+a,y+1
+    Next a
+    
+    s=1
+    
+    
+    
+    ElseIf MouseX() >= x And MouseX() <= x+13 And MouseY() >= y And MouseY() <= y+13 And MouseUp(1) Then
+    Color 255,255,255
+    'Box x,y,9,9
+    If is_checked Then
+    is_checked = False
+    Else
+    is_checked = True
+    EndIf
+    s=0
+    Else
+    Color 255,255,255
+    'Box x,y,9,9
+    s=0
+    EndIf
+    If m=1 Then
+    Color 248,182,54
+    Line x+1,y+11,x+11,y+11
+    Line x+11,y+1,x+11,y+11
+    If s=1
+    Line x+1,y+1,x+11,y+1
+    Line x+1,y+1,x+1,y+11
+    EndIf
+    EndIf
+    
+    Color 0,0,0
+    Text x+11+5,y+(9/2)+2-(TextHeight(txt)/2),txt
+    If is_checked Then
+    Color 33,33,200
+    Line x+3,y+7,x+5,y+9
+    Line x+3,y+6,x+5,y+8
+    Line x+3,y+5,x+5,y+7
+    Line x+6,y+6,x+9,y+3
+    Line x+6,y+7,x+9,y+4
+    Line x+6,y+8,x+9,y+5
+    EndIf
+    Color old_r,old_g,old_b
+    Return is_checked
+EndFunction
+
+Function ScaleImage(_image, _width, _height)
+   'If _width = ImageWidth(gScaledImage) And _height = ImageHeight(gScaledImage) Then Return gScaledImage
+   If _width <= 0 Or _height <= 0 Then Return gScaledImage
+   
+   DeleteImage gScaledImage
+   gScaledImage = MakeImage(_width, _height)
+   
+   // Tehdään temppikuva johon skaalataan ensin vain leveys
+   lTempImage = MakeImage(_width, ImageHeight(_image))
+   DrawToImage lTempImage
+   For x = 0 To _width - 1
+       sx# = Float(ImageWidth(_image)) / Float(_width) * Float(x)
+       DrawImageBox _image, x, 0, sx, 0, 1, ImageHeight(_image)
+   Next x
+   DrawToScreen
+   
+   // Skaalataan myös pystysuunnassa
+   DrawToImage gScaledImage
+   For y = 0 To _height - 1
+       sy# = Float(ImageHeight(_image)) / Float(_height) * Float(y)
+       DrawImageBox lTempImage, 0, y, 0, sy, ImageWidth(lTempImage), 1
+   Next y
+   DrawToScreen
+   DeleteImage lTempImage
+   MaskImage gScaledImage,0,0,0
+   
+   Return gScaledImage
+EndFunction
+
+
+
+// LISTBOX //
+
+Function List(id, x,y, listw, listh, Scrollbar=1, keySelection=1)
+	old_r = getRGB(RED)
+	old_g = getRGB(GREEN)
+	old_b = getRGB(BLUE)
+	If listw < TextWidth("A") Then listw = TextWidth("A")
+	If listh < TextHeight("A") Then listh = TextHeight("A")
+    
+	Color 64,64,64
+	Line x-1,y-1,x+listw-1,y-1
+	Line x-1,y,x-1,y+listh-1
+	Color 212,208,200
+	Line x-1,y+listh,x+listw,y+listh
+	Line x+listw,y-1,x+listw,y+listh-1
+	Color 128,128,128
+	Line x-2,y-2,x+listw,y-2
+	Line x-2,y-1,x-2,y+listh
+    Color old_r, old_g, old_b
+	Line x-2,y+listh+1,x+listw+1,y+listh+1
+	Line x+listw+1,y-2,x+listw+1,y+listh
+	Box x,y,listw,listh
+    
+    If MouseDown(1) Then
+        If MouseX()=>x And MouseX()<=x+listw And MouseY()=>y And MouseY()<=y+listh Then
+            If ListActive(id)=False And keySelection Then a=mousemovez() 'pyyhkii hiiren rullan tiedot pois, jottei aktivointi saa listaa rullaamaan hassusti mousemovez
+            ListActive(id)=True
+            If MouseHit(1) Then
+                If Scrollbar=False Or MouseX()<x+listw-15 Then
+                    item = (MouseY()-y)/TextHeight("A")+ListScroll(id)
+                    SelectListItem(id,item)
+                    ListSelectChanged(id)=True
+                End If
+            End If
+        Else
+            ListActive(id)=False
+        End If
+    End If
+    
+    If keySelection And ListActive(id) Then
+        If KeyHit(cbkeyup) Then ListSelection(id)=Max(ListSelection(id)-1,1):ListSelectChanged(id)=True
+        If KeyHit(cbkeydown) Then ListSelection(id)=Min(ListSelection(id)+1,ListItemsNo(id)):ListSelectChanged(id)=True
+        ListScroll(id)=ListScroll(id)-MouseMoveZ()
+        ListScroll(id) = Max(Min(ListScroll(id),ListItemsNo(id)-listh/TextHeight("A")+1),1)
+    End If
+    
+    ListSelection(id) = Min(Max(ListSelection(id),0),ListItemsNo(id))
+    
+    If ListSelection(id)=>ListScroll(id) And ListSelection(id)<ListScroll(id)+listh/TextHeight("A") Then
+        Color cbdarkblue
+        yy = y+ (ListSelection(id)-ListScroll(id))*TextHeight("A")
+        Box x+1,yy, listw-2, TextHeight("A")
+    End If
+        
+    If ListItemsNo(id)>listh/TextHeight("A") And Scrollbar Then
+        If ListActive(id) And MouseDown(1) And MouseX()=>x+listw-15 Then
+            Pros# = ((MouseY()-y)*1.0)/listh
+            ListScroll(id) = Pros *(ListItemsNo(id)-listh/TextHeight("A"))+1
+            ListScroll(id) = Max(Min(ListScroll(id),ListItemsNo(id)-listh/TextHeight("A")+1),1)
+        End If
+    
+        Color 64,64,64
+        Box x+listw-15,y,15,listh, OFF
+        Color 212,208,200
+        Box x+listw-14,y+1,13,listh-2,OFF
+        Color 212,208,200
+        Box x+listw-13,y+2,11,listh-4
+        
+        Color cbdark
+        Pros# = (ListScroll(id)-1.0)/(ListItemsNo(id)-listh/TextHeight("A"))
+        yy = y + (listh-15)*Pros
+        Box x+listw-15,yy,15,TextHeight("A")
+    End If
+    
+    ListScroll(id) = Max(Min(ListScroll(id),ListItemsNo(id)-listh/TextHeight("A")+1),1)
+
+    Color 0,0,0
+    MinItem=max(ListScroll(id),1)
+    MaxItem=min(ListScroll(id)+listh/TextHeight("A")-1,ListItemsNo(id))
+    For i = MinItem To MaxItem
+        yy=y+TextHeight("A")*(i-ListScroll(id))
+        Text x+2,yy, ListItems(id,i)
+    Next i
+    
+    Color old_r,old_g,old_b
+End Function
+
+Function SelectListItem(id,item)
+    ListSelection(id)=item
+End Function
+
+Function SelectListItemString(id,item$)
+    For i = 1 To ListItemsNo(id)
+        If ListItems(id,i)=item Then
+            ListSelection(id)=i
+            Return True
+        End If
+    Next i
+    Return False
+End Function
+
+Function AddListItem(id, item$, selection=0)
+    If ListItemsNo(id)=ListItemsNoMax Then Return False
+    ListItemsNo(id)=ListItemsNo(id)+1
+    ListItems(id,ListItemsNo(id))=item
+    If selection Then
+        ListSelection(id)=ListItemsNo(id) : ListSelectChanged(id)=True
+        ListScroll(id) = Max(ListScroll(id),ListSelection(id))
+    End If
+    Return ListItemsNo(id)
+End Function
+
+Function DeleteListItem(id, item)
+    If item=0 Then Return False
+    For i = item To ListItemsNo(id)
+        If i<ListItemsNo(id) Then ListItems(id,i)=ListItems(id,i+1) Else ListItems(id,i)=""
+    Next i
+    ListItemsNo(id) = ListItemsNo(id)-1
+End Function
+
+Function DeleteListItemString(id, itemString$)
+    For i = 1 To ListItemsNo(id)
+        If ListItems(id,i)=itemString Then
+            item=i
+            Exit
+        End If
+    Next i
+    If item=0 Then Return False
+    For i = item To ListItemsNo(id)
+        If i<ListItemsNo(id) Then ListItems(id,i)=ListItems(id,i+1) Else ListItems(id,i)=""
+    Next i
+    ListItemsNo(id) = ListItemsNo(id)-1
+    Return True
+End Function
+
+Function FormatList(id)
+    For i = 1 To ListItemsNo(id)
+        ListItems(id,i)=""
+    Next i
+    ListItemsNo(id)=0
+    ListSelectionChanged(id)=False
+    ListSelection(id)=0
+End Function
+
+Function ChangeListItem(id,item,NewItem$)
+    ListItems(id,item) = NewItem
+End Function
+
+Function ChangeListItemString(id,item$,NewItem$)
+    For i = 1 To ListItemsNo(id)
+        If ListItems(id,i)=item Then
+            ListItems(id,i) = NewItem
+            Return True
+        End If
+    Next i
+    Return False
+End Function
+
+Function GetListSelection$(id)
+    Return ListItems(id,ListSelection(id))
+End Function
+
+Function ListSelectionChanged(id)
+    If ListSelectChanged(id) Then
+        ListSelectChanged(id)=False
+        Return True
+    Else
+        Return False
+    End If
+End Function
+
+Function SortList(id,sortType=0)
+    //sortType: 0: Nouseva aakkosjärjestys; 1: Laskeva aakkosjärjestys
+    
+    For i = 1 To ListItemsNo(id)
+        iItem$ = ListItems(id,i)
+        For j = i+1 To ListItemsNo(id)
+            jItem$ = ListItems(id,j)
+            If jItem<iItem And sortType=0 Then
+                ListItems(id,i)=jItem
+                ListItems(id,j)=iItem
+                iItem=jItem
+            ElseIf jItem>iItem And sortType=1 Then
+                ListItems(id,i)=jItem
+                ListItems(id,j)=iItem
+                iItem=jItem
+            End If
+        Next j
+    Next i
+End Function
+
+
+
+
+
+
+
+Function Radiobutton(stri$,x,y,group,id) //Windows XP tyylinen radionappula, ohjeet: stri$=teksti, x=x-sijainti, y=y-sijainti, group=ryhmä johon kuuluu, id=tunnus
+    // Onko tämä nappi valittu
+    If checked_xpradio(group)=id Then is_checked = True
+    // Onko nappi disabled, jos ei niin:
+    If disabled_xpradio(group)=False Then
+    
+    If MouseX() >= x And MouseX() <= x+13 And MouseY() >= y And MouseY() <= y+13 And MouseUp(1) Then
+    
+    Color 28,81,128
+    Circle x,y,13,0
+    Color 130,130,180
+    Circle x+1,y+1,11
+    Color 250,192,78
+    Circle x+1,y+1,11,0
+    Circle x+2,y+2,9,0
+    
+    If is_checked = False Then
+    is_checked = True
+    checked_xpradio(group)=id
+    Else
+    is_checked = False
+    EndIf
+    Else
+    
+    Color 28,81,128
+    Circle x,y,13,0
+    Color 130,130,180
+    Circle x+1,y+1,11
+    If MouseX() >= x And MouseX() <= x+13 And MouseY() >= y And MouseY() <= y+13
+    Color 250,192,78
+    Circle x+1,y+1,11,0
+    Circle x+2,y+2,9,0
+    EndIf
+    
+    
+    EndIf
+    
+    Color 0,0,0
+    Text x+15,y,stri$
+    
+    If is_checked = True Then
+    Color 169,220,166
+    Circle x+4,y+4,5,1
+    Color 85,213,81
+    Circle x+5,y+5,4,1
+    Color 33,161,33
+    Line x+7,y+6,x+6,y+8
+    Color 19,146,16
+    Dot x+7,y+7
+    
+    Return True
+    Else
+    Return False
+    EndIf
+    // Jos disabled = true
+    Else
+    
+    Color 119,107,99
+    Circle x,y,13,0
+    Color 239,239,222
+    Circle x+1,y+1,11
+    If is_checked = True Then
+    Color 219,219,202
+    Circle x+4,y+4,5,1
+    Color 202,202,202
+    Circle x+5,y+5,4,1
+    Color 153,153,136
+    Line x+7,y+6,x+6,y+8
+    Color 99,87,89
+    Dot x+7,y+7
+    EndIf
+    
+    Color 173,173,156
+    Text x+15,y,stri$
+    EndIf
+
+EndFunction
+
+Function DisableRadioGroup(group, state=1)//Poistaa radioryhmän käytöstä, ohjeet: group=ryhmä, state=onko disabloitu?
+disabled_xpradio(group) = state
+EndFunction
+
+Function CheckRadioButton(group,id)//Valitsee radionappulan, ohjeet: group=ryhmä, id=tunnus
+checked_xpradio(group) = id
+EndFunction
+
+
+
+
+
+
+
+
+
+// QUATERNION OPERATIONS
+
+
+// Create quaternion from an angle and axis
+Function QuaternionFromAxisAngle(Angle#, x#, y#, z#)
+    sin_a# = Sin(Angle / 2)
+    qTemp(0) = Cos(Angle / 2)   //w
+    qTemp(1) = x * sin_a        //x
+    qTemp(2) = y * sin_a        //y
+    qTemp(3) = z * sin_a        //z
+End Function
+
+
+// Set quaternion's length to 1
+Function Normalize(id)
+    If id = 0 Then 
+        Magnitude# = Sqrt(qTemp(0)^2 + qTemp(1)^2 + qTemp(2)^2 + qTemp(3)^2)   
+        If Magnitude <> 0 Then
+            qTemp(0) = qTemp(0) / Magnitude
+            qTemp(1) = qTemp(1) / Magnitude
+            qTemp(2) = qTemp(2) / Magnitude
+            qTemp(3) = qTemp(3) / Magnitude 
+        EndIf
+    Else
+        Magnitude# = Sqrt(qStars(0)^2 + qStars(1)^2 + qStars(2)^2 + qStars(3)^2)   
+        If Magnitude <> 0 Then
+            qStars(0) = qStars(0) / Magnitude
+            qStars(1) = qStars(1) / Magnitude
+            qStars(2) = qStars(2) / Magnitude
+            qStars(3) = qStars(3) / Magnitude 
+        EndIf
+    EndIf
+End Function
+
+
+// Multiply 2 quaternions
+Function MultiplyQuaternion()
+    qStars(0) = qTemp(0) * qStars(0) - qTemp(1) * qStars(1) - qTemp(2) * qStars(2) - qTemp(3) * qStars(3)
+    qStars(1) = qTemp(0) * qStars(1) + qTemp(1) * qStars(0) + qTemp(2) * qStars(3) - qTemp(3) * qStars(2)
+    qStars(2) = qTemp(0) * qStars(2) - qTemp(1) * qStars(3) + qTemp(2) * qStars(0) + qTemp(3) * qStars(1)
+    qStars(3) = qTemp(0) * qStars(3) + qTemp(1) * qStars(2) - qTemp(2) * qStars(1) + qTemp(3) * qStars(0) 
+End Function
+
+// Convert quaternion to matrix (for transforming...)
+Function CreateMatrix()
+        // First row
+        mStars( 1) = 1.0 - 2.0 * ( qStars(2) * qStars(2) + qStars(3) * qStars(3) )
+        mStars( 2) = 2.0 * ( qStars(1) * qStars(2) + qStars(3) * qStars(0) )
+        mStars( 3) = 2.0 * ( qStars(1) * qStars(3) - qStars(2) * qStars(0) )
+        mStars( 4) = 0.0
+        // Second row
+        mStars( 5) = 2.0 * ( qStars(1) * qStars(2) - qStars(3) * qStars(0) )
+        mStars( 6) = 1.0 - 2.0 * ( qStars(1) * qStars(1) + qStars(3) * qStars(3) )
+        mStars( 7) = 2.0 * ( qStars(3) * qStars(2) + qStars(1) * qStars(0) )
+        mStars( 8) = 0.0
+        // Third row
+        mStars( 9) = 2.0 * ( qStars(1) * qStars(3) + qStars(2) * qStars(0) )
+        mStars(10) = 2.0 * ( qStars(2) * qStars(3) - qStars(1) * qStars(0) )
+        mStars(11) = 1.0 - 2.0 * ( qStars(1) * qStars(1) + qStars(2) * qStars(2) )
+        mStars(12) = 0.0
+        // Fourth row
+        'mStars(13) = mStars(13)
+        'mStars(14) = mStars(14)
+        'mStars(15) = mStars(15)
+        mStars(16) = 1.0
+End Function
+
+
+'Function MultiplyQuaternion2()
+'    qStars(0) = qStars(0) * qTemp(0) - qStars(1) * qTemp(1) - qStars(2) * qTemp(2) - qStars(3) * qTemp(3)
+'    qStars(1) = qStars(0) * qTemp(1) + qStars(1) * qTemp(0) + qStars(2) * qTemp(3) - qStars(3) * qTemp(2)
+'    qStars(2) = qStars(0) * qTemp(2) - qStars(1) * qTemp(3) + qStars(2) * qTemp(0) + qStars(3) * qTemp(1)
+'    qStars(3) = qStars(0) * qTemp(3) + qStars(1) * qTemp(2) - qStars(2) * qTemp(1) + qStars(3) * qTemp(0)
+'End Function
+
+// EasterEgg
+Dim AMMUS_X#(32), AMMUS_Y#(32), AMMUS_ELOSSA(32), AMMUS_KULMA(32)
+Function Tappelu()
+    TOP:
+    For i=1 To 32:AMMUS_ELOSSA(i)=False:Next i
+    x1#=ScreenWidth()/4*3:y1#=ScreenHeight()/2:a1=0:x2#=ScreenWidth()/4:y2#=ScreenHeight()/2:a2=180
+    Repeat
+        Cls
+        Color cbWhite: Text 10,ScreenHeight()-TextHeight("I"),"WASD+TAB, Arrows+CTRL"
+        a1=a1-((RightKey()-LeftKey()))*5:s1=((UpKey()-DownKey()))*2:x1=x1+Cos(a1)*s1:y1=y1-Sin(a1)*s1
+        a2=a2-((KeyDown(cbKeyD)-KeyDown(cbKeyA)))*5:s2=((KeyDown(cbKeyW)-KeyDown(cbKeyS)))*2:x2=x2+Cos(a2)*s2:y2=y2-Sin(a2)*s2
+        If KeyDown(cbKeyRControl) And Timer()>edellinen+500 Then
+            For i=1 To 32
+                If AMMUS_ELOSSA(i)=False Then AMMUS_ELOSSA(i)=True:AMMUS_X(i)=x1+Cos(a1)*16:AMMUS_Y(i)=y1-Sin(a1)*16:AMMUS_KULMA(i)=a1:edellinen=Timer():Exit
+            Next i
+        EndIf
+        If KeyDown(cbKeyTab) And Timer()>edellinen2+500 Then
+            For i=1 To 32
+                If AMMUS_ELOSSA(i)=False Then AMMUS_ELOSSA(i)=True:AMMUS_X(i)=x2+Cos(a2)*16:AMMUS_Y(i)=y2-Sin(a2)*16:AMMUS_KULMA(i)=a2:edellinen2=Timer():Exit
+            Next i
+        EndIf
+        Color 255,80,255:Circle x1-8,y1-8,16,OFF:Color cbWhite:Line x1,y1,x1+Cos(a1)*16,y1-Sin(a1)*16
+        Color 80,248,255:Circle x2-8,y2-8,16,OFF:Color cbWhite:Line x2,y2,x2+Cos(a2)*16,y2-Sin(a2)*16
+        For i=1 To 32
+            If AMMUS_ELOSSA(i)=True Then
+                AMMUS_X(i)=AMMUS_X(i)+Cos(AMMUS_KULMA(i))*5:AMMUS_Y(i)=AMMUS_Y(i)-Sin(AMMUS_KULMA(i))*5
+                If AMMUS_X(i)<0 Or AMMUS_X(i)>ScreenWidth() Or AMMUS_Y(i)<0 Or AMMUS_Y(i)>ScreenHeight() Then AMMUS_ELOSSA(i)=False
+                Dot AMMUS_X(i),AMMUS_Y(i)
+                If Distance(AMMUS_X(i),AMMUS_Y(i),x1,y1)<16 Then Print "Magenta died!":pisteet2=pisteet2+1:Goto Endi
+                If Distance(AMMUS_X(i),AMMUS_Y(i),x2,y2)<16 Then Print "Cyan died!":pisteet1=pisteet1+1:Goto Endi
+            EndIf
+        Next i
+        DrawScreen
+    Forever
+    Endi:
+    Print "Cyan:"+pisteet2:Print "Magenta:"+pisteet1:Print "ESC to quit, ENTER to start..."
+    Repeat
+        If KeyDown(28) Then Goto TOP
+        If KeyDown(1)  Then ClearKeys : Wait 500: Exit
+    Forever
+End Function
+
+
+//EasterEgg
+Dim PixXx#(100):Dim PixXy#(100)
+Dim PixXang#(100):Dim PixXspd#(100)
+Function PixX(x0,y0)
+	For i = 0 To 100
+		PixXx(i)=0:PixXy(i)=0
+		PixXang(i) = Rand(0,359)
+		PixXspd(i) = Rnd(3)
+	Next i
+	Repeat
+		For i = 0 To 100
+			PixXx(i) = PixXx(i) + Cos(PixXang(i)) * PixXspd(i)
+			PixXy(i) = PixXy(i) - Sin(PixXang(i)) * PixXspd(i)
+			Color 255-c,0,0
+			Dot PixXx(i)+x0,PixXy(i)+y0
+		Next i
+		c = c + 10
+        DrawScreen
+	Until c>255
+End Function

@@ -1,0 +1,31 @@
+Reaching for Stars
+------------------
+
+! Ohjeita betatestaajille !
+
+Lue Readme.txt josta löytyy vinkkiä pelaamiseen.
+Tutustu myös Known Issues osioon, jotta et turhaan raportoi tiedossa olevista ongelmista.
+
+Kirjoita muistiin kaikki havaitsemasi bugit ja niiden esiintymistilanteet, esim.
+ * Virheilmoitukset (Memory Access Violation, Can't Read From Negative Array Index...)
+ * Virheellinen toiminta (esim. nappula tekee muuta kun sen pitäisi tai ei toimi ollenkaan)
+ * Käyttöliittymän kauneusvirheet (esim. tekstiä ruudun tai nappulan ulkopuolella)
+ * Muut kummallisuudet ja epäloogisuudet
+
+Esitä myös parannusehdotuksia, jos jonkin voisi mielestäsi tehdä paremmin.
+Eli miten tehdä pelistä mielenkiintoisemman.
+(Onko avaruusalukset aluksi liian hitaita? Onko teksti ruman väristä? jne...)
+
+Kirjoita kaikki vapaamuotoiseen tekstitiedostoon (.txt).
+Kuvat virhetilanteista tai parannusehdotuksien hahmotelmista olisivat erittäin mukavia.
+(F11 ottaa screenshotin melkein joka tilanteessä; jos ei, niin PrintScreen nappulalla saa kopioitua ruudun sisällön leikepöydälle, josta sen voi kopioida ja tallentaa piirtoohjelmassa (esim. Paint).)
+Suositeltava formaatti .png (.bmp vie paljon tilaa ja .jpg saattaa sutata yksityiskohdat).
+
+
+Lisäksi jos intoa riittää, niin sopii kehittää myös materiaalia peliä varten, esim.
+ * Tutkimusprojekteja (helppo tehdä, ohjeet ja mallia saa data-kansion techs.dat tiedostosta)
+ * Kuvia roduista; 60*60 pikseliä, formaatissa .png, taustan värinä valkoinen (RGB 255,255,255)
+ * Taustamusiikkiä (mieluiten mp3, mutta muukin formaatti saattaa sopia)
+ * Koodipätkiä (esim. löytyykö sinulta hieno nappula funktio, joka  mielestäsi sopisi paremmin visuaaliseen tyyliin kuin nykyinen?)
+ * laskukaavoja ja algoritmejä; miten sinun mielestäsi pitäisi laskea vuotuinen populaation lisäys tai se, että hyväksyykö tekoäly kaupan teon?
+
